@@ -182,12 +182,10 @@ function getInstructionType(instruction){
 	var instructionObject;
 	// Memory Instruction
 	if (parsed[0] == "L.D"){
-	    var regLoc = parsed[2].match(/(\$\d+)/);
 		instructionObject = {type:"mem", dest:parsed[1], src:parsed[2], trgt:null, FU:"integer"};
 	}
 	else if (parsed[0] == "S.D"){
-	    var regLoc = parsed[2].match(/(\$\d+)/);
-		instructionObject = {type:"mem", dest:parsed[1], src:parsed[2], trgt:null, FU:"integer"};
+		instructionObject = {type:"mem", dest:null, src:parsed[1], trgt:parsed[2], FU:"integer"};
 	}
 	// Control Instruction
 	else if (	parsed[0] == "BEQ"
@@ -293,7 +291,7 @@ function executeInstruction(inst, srcVal, trgtVal, destLoc){
         return setValue(destLoc, fromMem);
     }
     if (inst === "S.D"){
-        return setValue(destLoc, trgtVal);
+        //return setValue(destLoc, trgtVal);
     }
     if (inst === "BEQ"){
         if (srcVal === trgtVal){
