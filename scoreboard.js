@@ -29,10 +29,10 @@ function runScoreboard(){
     var scoreboard = [];
 	getHardwareLatencies(hardwareLatency);
     
-	// Split each line into its own instruction and remove any empty lines
+	// Split each line into its own instruction and remove any empty or commented lines
 	instList = instList.split('\n');
 	instList = instList.filter(function(inst){
-		return (inst.trim() !== '');
+		return (inst.trim() !== '' && inst.trim()[0] !== '#');
 	});
 	instList = instList.map(function(line){
 	   return getInstructionType(line);
@@ -77,7 +77,12 @@ function runScoreboard(){
 	                pipeline[inst].nextState = "read";
 	                hardware[pipeline[inst].FU].busy = hardwareLatency[pipeline[inst].FU];
 	                hardware[pipeline[inst].FU].inputA = getValue(pipeline[inst].src);
-	                hardware[pipeline[inst].FU].inputB = getValue(pipeline[inst].trgt);
+	                if (pipeline[inst].inst !== "S.D"){
+	                    hardware[pipeline[inst].FU].inputB = getValue(pipeline[inst].trgt);
+	                }
+	                else {
+	                    hardware[pipeline[inst].FU].inputB = pipeline[inst].trgt;
+	                }
 	                hardware[pipeline[inst].FU].inst = pipeline[inst].inst;
 	            }
 	        }
@@ -111,16 +116,23 @@ function runScoreboard(){
 	            if (canWrite){
 	                pipeline[inst].nextState = "wb";
 	                var fu = hardware[pipeline[inst].FU];
-	                executeInstruction(fu.inst, fu.inputA, fu.inputB, pipeline[inst].dest);
+	                var result = executeInstruction(fu.inst, fu.inputA, fu.inputB, pipeline[inst].dest);
+	                if (pipeline[inst].type === "ctrl" && result === true){
+	                    var removed = pipeline.splice(inst+1, pipeline.length-inst);
+                        removed.forEach(function(remInstr){
+                            if (remInstr.issue !== null)
+                                scoreboard.push(deepCopy(remInstr));
+                        });
+	                }
 	                
 	            }
 	        }
 	    }
 	    
-        // Add next element into the pipeline
+        // Add next element into the pipeline if there is another instruction AND either (nothing is in the pipeline OR the last element in the pipeline has issued)
         if ((instList[IC]) && ((pipeline.length == 0) || (pipeline[pipeline.length-1].nextState === "issue"))){
-            pipeline.push(instList[IC]);
-            // console.log("Adding" + instList[IC].inst + "to the pipeline on clk: " +clk);
+            pipeline.push(deepCopy(instList[IC]));
+            console.log("Adding " + instList[IC].inst + " to the pipeline on clk: " +clk + " -- (IC: " + IC);
             IC++;
         }
         
@@ -139,8 +151,9 @@ function runScoreboard(){
 	       }
 	       return true;
 	    });
-
+        console.log("clk: " + clk + ", IC: " + IC);
 	    clk++;
+	    
 	}
 	// Since instructions were put in the scoreboard at different times (done at WB),
 	// they need to be sorted by issue clk cycles
@@ -210,10 +223,10 @@ function getInstructionType(instruction){
 		}
 	}
 	instructionObject.inst = parsed[0];
-	instructionObject.issue = 0;
-	instructionObject.read = 0;
-	instructionObject.exec = 0;
-	instructionObject.wb = 0;
+	instructionObject.issue = null;
+	instructionObject.read = null;
+	instructionObject.exec = null;
+	instructionObject.wb = null;
 	instructionObject.state = "waiting";
 	instructionObject.nextState = instructionObject.state;
 // 	console.log(instructionObject);
@@ -252,7 +265,7 @@ function getValue(location){
 }
 
 function setValue(location, val){
-    console.log("Putting " + val + " in " + location);
+    // console.log("Putting " + val + " in " + location);
     if (location[0] === 'F'){
         var idx = parseInt(location.substring(1));
         fpRegFile[idx] = val;
@@ -295,7 +308,7 @@ function executeInstruction(inst, srcVal, trgtVal, destLoc){
     if (inst === "S.D"){
         // console.log("inst: " + inst + ", src: " + srcVal + ", trgt: "+trgtVal+", destLoc: "+ destLoc);
         //return setValue(destLoc, trgtVal);
-        return setValue(destLoc, srcVal);
+        return setValue(trgtVal, srcVal);
     }
     if (inst === "BEQ"){
         if (srcVal === trgtVal){
@@ -335,6 +348,14 @@ function executeInstruction(inst, srcVal, trgtVal, destLoc){
         return quot;
     }
     
+}
+
+function deepCopy(obj){
+    var newObj = {};
+    Object.keys(obj).forEach(function(property){
+        newObj[property] = obj[property];
+    });
+    return newObj;
 }
 
 function printScoreboard(sb){
