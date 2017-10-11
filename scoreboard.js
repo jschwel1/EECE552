@@ -4,6 +4,7 @@ var fpRegFile = Array(32).fill(0.0);
 var intRegFile = Array(32).fill(0);
 var dataMem = [45, 12, 0, 0, 10, 135, 254, 127, 18, 4,
                55, 8, 2, 98, 13, 5, 233, 158, 167];
+                           
 var hardware = {
     fpAdder:{ busy:0, inst:null, inputA:null, inputB:null, result:null},
     fpMult:{ busy:0, inst:null, inputA:null, inputB:null, result:null},
