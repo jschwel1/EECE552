@@ -45,19 +45,19 @@ function runScoreboard(){
 	            for (var otherInst in pipeline){
 	                if (otherInst >= inst) break;
 	                if (pipeline[inst].dest === pipeline[otherInst].dest){
-	                    console.log("Cannot Issue " + pipeline[inst].inst + " on clk: "+ clk + "; waiting for " + pipeline[otherInst].inst + " to finish.");
+	                   // console.log("Cannot Issue " + pipeline[inst].inst + " on clk: "+ clk + "; waiting for " + pipeline[otherInst].inst + " to finish.");
 	                    canIssue = false;
 	                    break;
 	                }
 	                if (pipeline[inst].FU === pipeline[otherInst].FU){
 	                    canIssue = false;
-	                    console.log("Cannot Issue " + pipeline[inst].inst + " on clk: "+ clk + "; waiting for " + pipeline[otherInst].inst + " for FU.");
+	                   // console.log("Cannot Issue " + pipeline[inst].inst + " on clk: "+ clk + "; waiting for " + pipeline[otherInst].inst + " for FU.");
 	                    break;
 	                }
 	            }
 	            if (canIssue){
 	                pipeline[inst].nextState = "issue";
-	                console.log("Issuing " + pipeline[inst].inst + " on clk: " + clk);
+	               // console.log("Issuing " + pipeline[inst].inst + " on clk: " + clk);
 	            }
 	        }
 	        
@@ -150,6 +150,7 @@ function runScoreboard(){
 	printScoreboard(scoreboard);
 	printRegisterFile(intRegFile, "regFile_table", "RegFile");
 	printRegisterFile(fpRegFile, "fpRegFile_table", "FP RegFile");
+	printRegisterFile(dataMem, "dataMem_table", "Data Mem");
 //	console.log(scoreboard);
 	return instList;
 }
@@ -185,11 +186,11 @@ function getInstructionType(instruction){
 		instructionObject = {type:"mem", dest:parsed[1], src:parsed[2], trgt:null, FU:"integer"};
 	}
 	else if (parsed[0] == "S.D"){
-		instructionObject = {type:"mem", dest:null, src:parsed[1], trgt:parsed[2], FU:"integer"};
+	    var regVal = parsed[2].match(/(\$\d+)/);
+		instructionObject = {type:"mem", dest:regVal[0], src:parsed[1], trgt:parsed[2], FU:"integer"};
 	}
 	// Control Instruction
-	else if (	parsed[0] == "BEQ"
-			 ||	parsed[0] == "BNE"){
+	else if ((parsed[0] == "BEQ") || (parsed[0] == "BNE")){
 		instructionObject = {type:"ctrl", src:parsed[1], trgt:parsed[2], dest:parsed[3], FU:"integer"};
 	}
 	// ALU Instruction
@@ -215,7 +216,7 @@ function getInstructionType(instruction){
 	instructionObject.wb = 0;
 	instructionObject.state = "waiting";
 	instructionObject.nextState = instructionObject.state;
-	console.log(instructionObject);
+// 	console.log(instructionObject);
     return instructionObject;
 }
 /**
@@ -240,17 +241,18 @@ function getValue(location){
         return (intRegFile[idx] || 0);
     }
     if (location[0] === '#'){
-        return location.substring(1);
+        return parseInt(location.substring(1));
     }
     var parsedInput = location.match(/(\d*)\(\$(\d)\)/);
     if (parsedInput){
         index = intRegFile[parsedInput[2]];
-        offset = parsedInput[1]
-        return (dataMem[index+offset] || 0);
+        offset = parsedInput[1];
+        return (parseInt(dataMem[index+offset]) || 0);
     }
 }
 
 function setValue(location, val){
+    console.log("Putting " + val + " in " + location);
     if (location[0] === 'F'){
         var idx = parseInt(location.substring(1));
         fpRegFile[idx] = val;
@@ -262,8 +264,8 @@ function setValue(location, val){
     }
     var parsedInput = location.match(/(\d*)\(\$(\d)\)/);
     if (parsedInput){
-        index = intRegFile[parsedInput[2]];
-        offset = parsedInput[1]
+        index = parseInt(intRegFile[parsedInput[2]]);
+        offset = parseInt(parsedInput[1]);
         dataMem[index+offset] = val;
     }
     return val;
@@ -291,7 +293,9 @@ function executeInstruction(inst, srcVal, trgtVal, destLoc){
         return setValue(destLoc, fromMem);
     }
     if (inst === "S.D"){
+        // console.log("inst: " + inst + ", src: " + srcVal + ", trgt: "+trgtVal+", destLoc: "+ destLoc);
         //return setValue(destLoc, trgtVal);
+        return setValue(destLoc, srcVal);
     }
     if (inst === "BEQ"){
         if (srcVal === trgtVal){
