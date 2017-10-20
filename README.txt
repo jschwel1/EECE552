@@ -27,20 +27,27 @@ Floating point registers Fd, d={0,...,31}
 Integer registers $d, d={0,...,31}
 Data Memory: addresses={0,...,18}
 
-NOTE: $0 acts as any other register, rather than only storing 0
+Note: $0 acts as any other register, rather than only storing 0
 
 --------------------------------------
 --------How to Use--------------------
 --------------------------------------
-Start by entering the latencies for each of the functional units, then enter an instruction followed by the necessary parameters. Commas can be used, but are not required. The 'f' in floating point registers is case insensitive. For memory locations, an offset must be in place (e.g. 16($3), but can be 0).
+1) Enter the latencies for each of the fuctional units
+2) Enter Assembly instructions (from those listed above) with their required parameters.
+	- Commas can be used, but are not necessary
+	- The 'F' for floating point registers is case-insensitive, to use one use Fn, where 0 <= n <= 31
+	- For an integer register, use $n, where 0 <= n <= 31
+	- For a data memory location, use O($n), where O is any offset and n is any register holding the base address.
+	- For an immediate value, the value must be preceded by a '#'.
+	- If the program does not seem to run, double check that all instructions are correctly spelled correctly. If it is a caught error, an alert will pop up to inform the user of what happened.
+3) To run the code, click the run button. The scoreboard and memory tables will generate at the bottom of the page upon completion.
 
-To run the code, click the run code button. The scoreboard and memory tables will generate upon completion.
-
-Note: The register files will initialize to all 0s on page load, but will not be reset between runs, so make sure to only use a register if you know what is in it.
+Note: The register files will initialize to all 0s on page load, but will not be reset between runs, so make sure to only use a register if you know what is in it. Also, branch instructions will always predict not taken, and will use up a cycle to flush out the pipeline if it is taken.
 
 Comments:
-The code will only read the necessary parameters for each instruction, so any additional text will be ignored and can be used for comments (e.g. ADD.D F1 F2 F3 ; this is a comment). 
-Important Note: Comment lines are ignored by the parser, so they do not count towards branch destinations.
+The code will only read the necessary parameters for each instruction, so any additional text will be ignored and can be used for comments 
+	- E.g. ADD.D F1 F2 F3 ; this is a comment.
+ 	- Comment lines are ignored by the parser, so they do not count towards branch destinations.
 
 
 --------------------------------------

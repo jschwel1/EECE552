@@ -1,18 +1,30 @@
-// Global variables that don't need to be reset everytime runScoreboard
-// is called
+// Global variables that are accessed by multiple functions
 var fpRegFile = Array(32).fill(0.0);
 var intRegFile = Array(32).fill(0);
 var dataMem = [45, 12, 0, 0, 10, 135, 254, 127, 18, 4,
                55, 8, 2, 98, 13, 5, 233, 158, 167];
-                           
 var hardware = {
     fpAdder:{ busy:0, inst:null, inputA:null, inputB:null, result:null},
     fpMult:{ busy:0, inst:null, inputA:null, inputB:null, result:null},
     fpDiv:{ busy:0, inst:null, inputA:null, inputB:null, result:null},
     integer:{ busy:0, inst:null, inputA:null, inputB:null, result:null}
 };
-// This needs to be global so executeInstruction() can update it on a branch
 var IC = 0;
+
+/**
+ * Function: startScoreboard()
+ * This function surrounds runScoreboard() in a try/catch block so it can
+ * easily display any error messages to the user through an alert popup.
+ */
+function startScoreboard(){
+    try {
+       runScoreboard();
+    }
+    catch (e){
+        alert("Error: " + e);
+    }
+    
+}
 
 /**
 * function runScoreboard()
@@ -30,7 +42,7 @@ function runScoreboard(){
     var scoreboard = [];
 	getHardwareLatencies(hardwareLatency);
     
-	// Split each line into its own instruction and remove any empty or commented lines
+	// Split each line into its own instruction and remove empty/commented lines
 	instList = instList.split('\n');
 	instList = instList.filter(function(inst){
 		return (inst.trim() !== '' && inst.trim()[0] !== '#');
@@ -38,33 +50,36 @@ function runScoreboard(){
 	instList = instList.map(function(line){
 	   return getInstructionType(line);
 	});
+	
+	// Loop as long as IC is not at the end of the program and there are
+	// instructions in the pipeline
 	while ((IC < instList.length) || (pipeline.length > 0)){
+	    // Loop through every instruction in the pipeline
 	    for (var inst in pipeline){
 	        // If waiting to issue, check WAW and FU
 	        if (pipeline[inst].state == "waiting"){
+	            // Go through all other instructions in the pipeline to see if
+	            // this one can be issued
 	            var canIssue = true;
 	            for (var otherInst in pipeline){
 	                if (otherInst >= inst) break;
-	                if (pipeline[inst].dest === pipeline[otherInst].dest){
-	                   // console.log("Cannot Issue " + pipeline[inst].inst + " on clk: "+ clk + "; waiting for " + pipeline[otherInst].inst + " to finish.");
+	                if (    pipeline[inst].dest === pipeline[otherInst].dest
+	                    ||  pipeline[inst].FU === pipeline[otherInst].FU){
 	                    canIssue = false;
-	                    break;
-	                }
-	                if (pipeline[inst].FU === pipeline[otherInst].FU){
-	                    canIssue = false;
-	                   // console.log("Cannot Issue " + pipeline[inst].inst + " on clk: "+ clk + "; waiting for " + pipeline[otherInst].inst + " for FU.");
 	                    break;
 	                }
 	            }
 	            if (canIssue){
 	                pipeline[inst].nextState = "issue";
-	               // console.log("Issuing " + pipeline[inst].inst + " on clk: " + clk);
 	            }
 	        }
 	        
 	        // If the instruction has all sources, it can read the variables
 	        // Check for RAW
 	        else if (pipeline[inst].state == "issue"){
+	            // Go through all other instructions issued before this one in
+	            // the pipeline to check that this one has all the sources it
+	            // needs to start executing
 	            var canRead = true;
 	            for (var otherInst in pipeline){
 	                if (otherInst >= inst) break;
@@ -76,13 +91,17 @@ function runScoreboard(){
 	            }
 	            if (canRead){
 	                pipeline[inst].nextState = "read";
-	                hardware[pipeline[inst].FU].busy = hardwareLatency[pipeline[inst].FU];
-	                hardware[pipeline[inst].FU].inputA = getValue(pipeline[inst].src);
+	                hardware[pipeline[inst].FU].busy =
+	                                        hardwareLatency[pipeline[inst].FU];
+	                hardware[pipeline[inst].FU].inputA =
+	                                        getValue(pipeline[inst].src);
 	                if (pipeline[inst].inst !== "S.D"){
-	                    hardware[pipeline[inst].FU].inputB = getValue(pipeline[inst].trgt);
+	                    hardware[pipeline[inst].FU].inputB =
+	                                            getValue(pipeline[inst].trgt);
 	                }
 	                else {
-	                    hardware[pipeline[inst].FU].inputB = pipeline[inst].trgt;
+	                    hardware[pipeline[inst].FU].inputB =
+	                                                    pipeline[inst].trgt;
 	                }
 	                hardware[pipeline[inst].FU].inst = pipeline[inst].inst;
 	            }
@@ -94,9 +113,9 @@ function runScoreboard(){
 	                hardware[pipeline[inst].FU].busy--;
 	            }
 	            else {
-	                // Since no other instruction can execute as long as there is an
-	                // instruction in the pipeline using the same FU, nothing will
-	                // "execute" until the WB state
+	                // Since no other instruction can execute as long as there
+	                // is an instruction in the pipeline using the same FU,
+	                // nothing will "execute" until the WB state
 	                pipeline[inst].nextState = "exec";
 	                hardware[pipeline[inst].FU].busy = 0;
 	            }
@@ -117,9 +136,13 @@ function runScoreboard(){
 	            if (canWrite){
 	                pipeline[inst].nextState = "wb";
 	                var fu = hardware[pipeline[inst].FU];
-	                var result = executeInstruction(fu.inst, fu.inputA, fu.inputB, pipeline[inst].dest);
+	                var result = executeInstruction(fu.inst,
+	                                                fu.inputA,
+	                                                fu.inputB,
+	                                                pipeline[inst].dest);
 	                if (pipeline[inst].type === "ctrl" && result === true){
-	                    var removed = pipeline.splice(inst+1, pipeline.length-inst);
+	                    var removed = pipeline.splice(inst+1,
+	                                                  pipeline.length-inst);
                         removed.forEach(function(remInstr){
                             if (remInstr.issue !== null)
                                 scoreboard.push(deepCopy(remInstr));
@@ -130,10 +153,12 @@ function runScoreboard(){
 	        }
 	    }
 	    
-        // Add next element into the pipeline if there is another instruction AND either (nothing is in the pipeline OR the last element in the pipeline has issued)
-        if ((instList[IC]) && ((pipeline.length == 0) || (pipeline[pipeline.length-1].nextState === "issue"))){
+        // Add next element into the pipeline if there is another instruction
+        // AND either (nothing is in the pipeline OR the last element in the
+        // pipeline has issued)
+        if (    (instList[IC]) && ((pipeline.length == 0)
+            ||  (pipeline[pipeline.length-1].nextState === "issue"))){
             pipeline.push(deepCopy(instList[IC]));
-            console.log("Adding " + instList[IC].inst + " to the pipeline on clk: " +clk + " -- (IC: " + IC);
             IC++;
         }
         
@@ -152,20 +177,18 @@ function runScoreboard(){
 	       }
 	       return true;
 	    });
-        console.log("clk: " + clk + ", IC: " + IC);
 	    clk++;
 	    
 	}
-	// Since instructions were put in the scoreboard at different times (done at WB),
-	// they need to be sorted by issue clk cycles
+	// Since instructions were put in the scoreboard at different times (done at
+	// WB), they need to be sorted by issue clk cycles
 	scoreboard.sort(function(a, b){
-	   return (a.issue - b.issue); // needed to be negative to sort in ascending order
+	   return (a.issue - b.issue);
 	});
 	printScoreboard(scoreboard);
 	printRegisterFile(intRegFile, "regFile_table", "RegFile");
 	printRegisterFile(fpRegFile, "fpRegFile_table", "FP RegFile");
 	printRegisterFile(dataMem, "dataMem_table", "Data Mem");
-//	console.log(scoreboard);
 	return instList;
 }
 
@@ -176,19 +199,21 @@ function runScoreboard(){
 *
 */
 function getHardwareLatencies(hardwareLatency){
-	hardwareLatency.fpAdder = parseInt(document.getElementById("fpAdder_clks").value);
-	hardwareLatency.fpMult = parseInt(document.getElementById("fpMult_clks").value);
-	hardwareLatency.fpDiv = parseInt(document.getElementById("fpDiv_clks").value);
-	hardwareLatency.integer = parseInt(document.getElementById("integer_clks").value);
+	hardwareLatency.fpAdder =
+	                    parseInt(document.getElementById("fpAdder_clks").value);
+	hardwareLatency.fpMult =
+	                    parseInt(document.getElementById("fpMult_clks").value);
+	hardwareLatency.fpDiv =
+	                    parseInt(document.getElementById("fpDiv_clks").value);
+	hardwareLatency.integer =
+	                    parseInt(document.getElementById("integer_clks").value);
 }
 
 /**
-* function getInstructionType(parsed)
-* This function takes an instruction and breaks it down into components
-* shared across all instruction types as well as ones specific to that
-* instruction. Each instruction has a type, FU, src, and dest, but a few
-* also have target registers.
-*
+* Function: getInstructionType(instruction)
+* This function takes an instruction and breaks it down into components.
+* Parameters:
+*       instruction - trimmed instruction line from assembly code
 */
 function getInstructionType(instruction){
 	// Make each element uppercase and remove any whitespace on the ends
@@ -197,30 +222,38 @@ function getInstructionType(instruction){
 	var instructionObject;
 	// Memory Instruction
 	if (parsed[0] == "L.D"){
-		instructionObject = {type:"mem", dest:parsed[1], src:parsed[2], trgt:null, FU:"integer"};
+		instructionObject = {type:"mem", dest:parsed[1], src:parsed[2],
+		                     trgt:null, FU:"integer"};
 	}
 	else if (parsed[0] == "S.D"){
 	    var regVal = parsed[2].match(/(\$\d+)/);
-		instructionObject = {type:"mem", dest:regVal[0], src:parsed[1], trgt:parsed[2], FU:"integer"};
+		instructionObject = {type:"mem", dest:regVal[0], src:parsed[1],
+		                     trgt:parsed[2], FU:"integer"};
 	}
 	// Control Instruction
 	else if ((parsed[0] == "BEQ") || (parsed[0] == "BNE")){
-		instructionObject = {type:"ctrl", src:parsed[1], trgt:parsed[2], dest:parsed[3], FU:"integer"};
+		instructionObject = {type:"ctrl", src:parsed[1], trgt:parsed[2],
+		                     dest:parsed[3], FU:"integer"};
 	}
 	// ALU Instruction
 	else {
 		if (parsed[0][parsed[0].length-1] == 'I'){
-			instructionObject = {type:"alu_i", src:parsed[2], trgt:parsed[3], dest:parsed[1], FU:"integer"};
+			instructionObject = {type:"alu_i", src:parsed[2], trgt:parsed[3],
+			                     dest:parsed[1], FU:"integer"};
 		}
 		else if (parsed[0].substring(parsed[0].length-2) == ".D"){
-			instructionObject = {type:"alu_f", src:parsed[2], trgt:parsed[3], dest:parsed[1], FU:"integer"};
+			instructionObject = {type:"alu_f", src:parsed[2], trgt:parsed[3],
+			                     dest:parsed[1], FU:"integer"};
 			if (parsed[0].match(/SUB|ADD/)) instructionObject.FU = "fpAdder";
 			else if (parsed[0].match(/MULT/)) instructionObject.FU = "fpMult";
 			else if (parsed[0].match(/DIV/)) instructionObject.FU = "fpDiv";
-			else instructionObject.FU = null;
+			else {
+			    throw ("Unknown Instruction: " + instruction);
+			}
 		}
 		else{
-			instructionObject = {type:"alu_r", src:parsed[2], trgt:parsed[3], dest:parsed[1], FU:"integer"};
+			instructionObject = {type:"alu_r", src:parsed[2], trgt:parsed[3],
+			                     dest:parsed[1], FU:"integer"};
 		}
 	}
 	instructionObject.inst = parsed[0];
@@ -230,11 +263,11 @@ function getInstructionType(instruction){
 	instructionObject.wb = null;
 	instructionObject.state = "waiting";
 	instructionObject.nextState = instructionObject.state;
-// 	console.log(instructionObject);
     return instructionObject;
 }
+
 /**
- * function getValue(input)
+ * Function: getValue(input)
  * This function returns the number stored in a register file
  * Parameters:
  *      input - string starting with F, $, or # representing the index in the
@@ -252,7 +285,9 @@ function getValue(location){
     }
     if (location[0] === '$'){
         var idx = parseInt(location.substring(1));
-        return (intRegFile[idx] || 0);
+        
+        var v = (intRegFile[idx] || 0);
+        return v;
     }
     if (location[0] === '#'){
         return parseInt(location.substring(1));
@@ -263,10 +298,23 @@ function getValue(location){
         offset = parsedInput[1];
         return (parseInt(dataMem[index+offset]) || 0);
     }
+    
+    throw ("Could not obtain a value from " + location +
+           ". Check that is is formatted correctly (see README)");
 }
 
+/**
+ * Function: setValue(location, val)
+ * This function sets location in the register files/data memory to val. Note
+ * this function will make any floating point value an integer before putting it
+ * int the integer register file.
+ * Parameters:
+ *      location - the location to store to (e.g. F0, $0, or 0($3) for a
+ *                 floating point register, integer register, or data memory
+ *                 location respecitively).
+ *      val - The value to set that register to.
+ */
 function setValue(location, val){
-    // console.log("Putting " + val + " in " + location);
     if (location[0] === 'F'){
         var idx = parseInt(location.substring(1));
         fpRegFile[idx] = val;
@@ -286,8 +334,9 @@ function setValue(location, val){
 }
 
 /**
- * function executeInstr(inst, inputA, inputB, destLoc)
- * This function executes the instruction and returns the result
+ * Function: executeInstr(inst, inputA, inputB, destLoc)
+ * This function executes the instruction and returns the result. This function
+ * will also store the value in the destination location.
  * parameters:
  *      inst - the instruction command to execute
  *      srcVal - the source register value, not the register index
@@ -307,8 +356,6 @@ function executeInstruction(inst, srcVal, trgtVal, destLoc){
         return setValue(destLoc, fromMem);
     }
     if (inst === "S.D"){
-        // console.log("inst: " + inst + ", src: " + srcVal + ", trgt: "+trgtVal+", destLoc: "+ destLoc);
-        //return setValue(destLoc, trgtVal);
         return setValue(trgtVal, srcVal);
     }
     if (inst === "BEQ"){
@@ -325,9 +372,9 @@ function executeInstruction(inst, srcVal, trgtVal, destLoc){
         }
         return false;
     }
-    // Javascript will add integers and floats with the same
-    // notation and the values will be in srcVal and trgtVal,
-    // so use same if statement for any add
+    // Javascript will uses the same arithmetic operators for float and
+    // integers, so just check the operator. setValue() will ensure it gets
+    // saved as a float or int.
     if (inst.match(/ADD/)){
         var sum = srcVal+trgtVal;
         setValue(destLoc, sum);
@@ -348,9 +395,17 @@ function executeInstruction(inst, srcVal, trgtVal, destLoc){
         setValue(destLoc, quot);
         return quot;
     }
-    
 }
 
+/**
+ * Function: deepCopy(obj)
+ * By default javascript passes anything more than a primitive type by
+ * reference, so this function is used to create an identical copy by making a
+ * new object with the same keys and values.
+ * Parameters:
+ *      obj - the obj to be copied
+ * Returns: New object with identical key-value pairs as obj
+ */
 function deepCopy(obj){
     var newObj = {};
     Object.keys(obj).forEach(function(property){
@@ -359,6 +414,14 @@ function deepCopy(obj){
     return newObj;
 }
 
+/**
+ * Function: printScoreboard(sb)
+ * This function takes an array of instructions and prints the scoreboard to
+ * the HTML table called scoreboard_table
+ * Parameters:
+ *      sb - the array of intstructions with clk cycles of each stage's
+ *           completion
+ */
 function printScoreboard(sb){
     var table = document.getElementById("scoreboard_table");
     while (table.childNodes.length > 0) {
@@ -388,9 +451,17 @@ function printScoreboard(sb){
     }
 }
 
+/**
+ * Function; printRegisterFile(regFile, htmlTable, title)
+ * This function builds an HTML table from a register file (array)
+ * Parameters:
+ *      regFile - the array of data to be displayed
+ *      htmlTable - the HTML id of the table
+ *      title - the title to be displayed above the table
+ */
 function printRegisterFile(regFile, htmlTable, title){
     var rfTable = document.getElementById(htmlTable);
-    // Remove any previous data
+    // Remove any previous cells in the table
     while (rfTable.childNodes.length > 0) {
         rfTable.removeChild(rfTable.childNodes[0]);
     }
@@ -419,5 +490,4 @@ function printRegisterFile(regFile, htmlTable, title){
         row.appendChild(data);
         rfTable.appendChild(row);
     }
-    
 }
