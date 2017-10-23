@@ -129,7 +129,8 @@ function runScoreboard(){
 	                if (    pipeline[inst].dest === pipeline[otherInst].src
 	                    ||  pipeline[inst].dest === pipeline[otherInst].trgt
 	                    ||  pipeline[otherInst].type === "ctrl"){
-    	                canWrite = false;
+	                    if (!pipeline[otherInst].read)
+	                        canWrite = false;
     	                break;
 	                }
 	            }
