@@ -51,7 +51,7 @@ function runScoreboard(){
 	        return getInstructionType(line);
 	    }
 	    catch (e){
-	        alert("Problem decoding " + line);
+	        alert("Error decoding " + line);
 	        return null;
 	    }
 	});
@@ -380,14 +380,14 @@ function executeInstruction(inst, srcVal, trgtVal, destLoc){
     }
     if (inst === "BEQ"){
         if (srcVal === trgtVal){
-            IC = destLoc;
+            IC = getValue(destLoc);
             return true;
         }
         return false;
     }
     if (inst === "BNE"){
         if (srcVal !== trgtVal){
-            IC = destLoc;
+            IC = getValue(destLoc);
             return true;
         }
         return false;
