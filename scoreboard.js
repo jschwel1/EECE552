@@ -21,9 +21,8 @@ function startScoreboard(){
        runScoreboard();
     }
     catch (e){
-        alert("Error: " + e);
+        alert("Error: " + e + "\n");
     }
-    
 }
 
 /**
@@ -48,7 +47,13 @@ function runScoreboard(){
 		return (inst.trim() !== '' && inst.trim()[0] !== '#');
 	});
 	instList = instList.map(function(line){
-	   return getInstructionType(line);
+	    try {
+	        return getInstructionType(line);
+	    }
+	    catch (e){
+	        alert("Problem decoding " + line);
+	        return null;
+	    }
 	});
 	
 	// Loop as long as IC is not at the end of the program and there are
@@ -90,20 +95,25 @@ function runScoreboard(){
 	                }
 	            }
 	            if (canRead){
-	                pipeline[inst].nextState = "read";
-	                hardware[pipeline[inst].FU].busy =
+	                try {
+    	                pipeline[inst].nextState = "read";
+    	                hardware[pipeline[inst].FU].busy =
 	                                        hardwareLatency[pipeline[inst].FU];
-	                hardware[pipeline[inst].FU].inputA =
+	                    hardware[pipeline[inst].FU].inputA =
 	                                        getValue(pipeline[inst].src);
-	                if (pipeline[inst].inst !== "S.D"){
-	                    hardware[pipeline[inst].FU].inputB =
-	                                            getValue(pipeline[inst].trgt);
+    	                if (pipeline[inst].inst !== "S.D"){
+    	                    hardware[pipeline[inst].FU].inputB =
+    	                                    getValue(pipeline[inst].trgt);
+    	                }
+    	                else {
+    	                    hardware[pipeline[inst].FU].inputB =
+    	                                                pipeline[inst].trgt;
+    	                }
+    	                hardware[pipeline[inst].FU].inst = pipeline[inst].inst;
 	                }
-	                else {
-	                    hardware[pipeline[inst].FU].inputB =
-	                                                    pipeline[inst].trgt;
+	                catch (e) {
+	                    throw e+"\nInstruction:" + pipeline[inst].inst + " ";
 	                }
-	                hardware[pipeline[inst].FU].inst = pipeline[inst].inst;
 	            }
 	        }
 	        // The instruction will stay in read until it's HW timer
@@ -179,6 +189,15 @@ function runScoreboard(){
 	       return true;
 	    });
 	    clk++;
+	    
+	    if (clk % 10000 == 0 && clk > instList.length*100){
+	        if (confirm("It looks like you might be in an endless loop," +
+	                    "Would you like to kill it?\n" +
+	                    "\rclk = " + clk)){
+	            return null;
+	        }
+	        
+	    }
 	    
 	}
 	// Since instructions were put in the scoreboard at different times (done at
@@ -300,8 +319,8 @@ function getValue(location){
         return (parseInt(dataMem[index+offset]) || 0);
     }
     
-    throw ("Could not obtain a value from " + location +
-           ". Check that is is formatted correctly (see README)");
+    throw ("Could not obtain a value from \"" + location +
+           "\". Check that is is formatted correctly (see README)");
 }
 
 /**
