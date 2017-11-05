@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- This is the HTML file to be used with scoreboard.js -->
 <html>
 <head>
 	<meta charset="utf-8">
@@ -8,6 +9,7 @@
 	<script src="scoreboard.js"></script>
     <h1>EECE 552 Project 1: Scoreboarding</h1>
     <a href="./README.txt" target="_blank">README/Instructions</a><br><br>
+    <!-- Table used to get input for latencies of the different Functional Units -->
 	<table>
 		<tr>
 		    <td>
@@ -42,10 +44,12 @@
             </td>
         </tr>
     </table>
+    <!-- Instruction Input -->
     <h2>Intructions:</h2><br>
 	<textarea id="instruction_input" rows="15" cols="50"></textarea>
 	<br>
 	<button onclick="startScoreboard()">Run</button>
+	<!-- Tables to display the scoreboard and FP register, integer register, and data memory to be build in the JavaScript code-->
 	<h2>Scoreboard:</h2>
     <table id="scoreboard_table" border="1px" padding="5px"></table>
 	<table id="fpRegFile_table" border="1px" padding="5px" style="float: left;"></table>
