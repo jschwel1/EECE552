@@ -68,8 +68,8 @@ function runScoreboard(){
 	            var canIssue = true;
 	            for (var otherInst in pipeline){
 	                if (otherInst >= inst) break;
-	                if (    pipeline[inst].dest === pipeline[otherInst].dest
-	                    ||  pipeline[inst].FU === pipeline[otherInst].FU){
+	                if (   (pipeline[inst].dest === pipeline[otherInst].dest)
+	                    || (pipeline[inst].FU === pipeline[otherInst].FU)){
 	                    canIssue = false;
 	                    break;
 	                }
@@ -97,17 +97,13 @@ function runScoreboard(){
 	            if (canRead){
 	                try {
     	                pipeline[inst].nextState = "read";
-    	                hardware[pipeline[inst].FU].busy =
-	                                        hardwareLatency[pipeline[inst].FU];
-	                    hardware[pipeline[inst].FU].inputA =
-	                                        getValue(pipeline[inst].src);
-    	                if (pipeline[inst].inst !== "S.D"){
-    	                    hardware[pipeline[inst].FU].inputB =
-    	                                    getValue(pipeline[inst].trgt);
+    	                hardware[pipeline[inst].FU].busy = hardwareLatency[pipeline[inst].FU];
+	                    hardware[pipeline[inst].FU].inputA = getValue(pipeline[inst].src);
+    	                if (pipeline[inst].inst === "S.D"){
+    	                    hardware[pipeline[inst].FU].inputB = pipeline[inst].trgt;
     	                }
     	                else {
-    	                    hardware[pipeline[inst].FU].inputB =
-    	                                                pipeline[inst].trgt;
+    	                    hardware[pipeline[inst].FU].inputB = getValue(pipeline[inst].trgt);
     	                }
     	                hardware[pipeline[inst].FU].inst = pipeline[inst].inst;
 	                }
