@@ -153,9 +153,10 @@ function runScoreboard(){
                     var fu = hardware[pipeline[inst].FU];
                     var result = executeInstruction(fu.inst, fu.inputA, fu.inputB, pipeline[inst].dest);
                     if (pipeline[inst].type === "ctrl" && result === true){
-                        var removed = pipeline.splice(inst+1,
-                                                      pipeline.length-inst);
+                        var removed = pipeline.splice(inst+1, pipeline.length-inst);
                         removed.forEach(function(remInstr){
+                            // Of the instructions removed from the pipeline, make sure
+                            // they actually issued before putting onto the scoreboard
                             if (remInstr.issue !== null)
                                 scoreboard.push(deepCopy(remInstr));
                         });
