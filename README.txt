@@ -64,3 +64,20 @@ The code will only read the necessary parameters for each instruction, so any ad
 	- E.g. ADD.D F1 F2 F3 ; this is a comment.
  	- Comment/blank lines are ignored by the parser, so they do not count towards branch destinations.
 
+
+--------------------------------------
+--------Sample Code-------------------
+--------------------------------------
+SUB.I $1, $1, $1
+SUB.I $2, $1, $1
+ADD.I $1, $1, #16
+L.D F9, 1($1)
+MULT.D F0,	F1,	F0
+ADD.D F4,	F0,	F2
+S.D F4, 0($2)
+ADD.I $2, $2, #8
+BNE	$1, $2, #4
+DIV.D F11, F9, F9
+MULT.D F8, F8, F8
+L.D F4, 1($2)
+DIV.D F10, F4, F4

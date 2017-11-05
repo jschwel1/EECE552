@@ -192,7 +192,7 @@ function runScoreboard(){
         clk++;
         
         if (clk % 10000 == 0 && clk > instList.length*100){
-            if (confirm("It looks like you might be in an endless loop," +
+            if (confirm("It looks like you might be in an endless loop, " +
                         "Would you like to kill it?\n" +
                         "\rclk = " + clk)){
                 return null;
