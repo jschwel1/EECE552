@@ -32,134 +32,139 @@ function startScoreboard(){
 * the scoreboard and display it in a table.
 */
 function runScoreboard(){
-	// Setup
-	IC = 0;
-	var clk = 0;
+    // Setup
+    IC = 0;
+    var clk = 0;
     var hardwareLatency = {fpAdder:0, fpMult:0, fpDiv:0, integer:0};
     var pipeline = [];
-	var instList = document.getElementById('instruction_input').value;
+    var instList = document.getElementById('instruction_input').value;
     var scoreboard = [];
-	getHardwareLatencies(hardwareLatency);
+    getHardwareLatencies(hardwareLatency);
     
-	// Split each line into its own instruction and remove empty/commented lines
-	instList = instList.split('\n');
-	instList = instList.filter(function(inst){
-		return (inst.trim() !== '' && inst.trim()[0] !== '#');
-	});
-	instList = instList.map(function(line){
-	    try {
-	        return getInstructionType(line);
-	    }
-	    catch (e){
-	        alert("Error decoding " + line);
-	        return null;
-	    }
-	});
-	
-	// Loop as long as IC is not at the end of the program and there are
-	// instructions in the pipeline
-	while ((IC < instList.length) || (pipeline.length > 0)){
-	    // Loop through every instruction in the pipeline
-	    for (var inst in pipeline){
-	        // If waiting to issue, check WAW and FU
-	        if (pipeline[inst].state == "waiting"){
-	            // Go through all other instructions in the pipeline to see if
-	            // this one can be issued
-	            var canIssue = true;
-	            for (var otherInst in pipeline){
-	                if (otherInst >= inst) break;
-	                if (   (pipeline[inst].dest === pipeline[otherInst].dest)
-	                    || (pipeline[inst].FU === pipeline[otherInst].FU)){
-	                    canIssue = false;
-	                    break;
-	                }
-	            }
-	            if (canIssue){
-	                pipeline[inst].nextState = "issue";
-	            }
-	        }
-	        
-	        // If the instruction has all sources, it can read the variables
-	        // Check for RAW
-	        else if (pipeline[inst].state == "issue"){
-	            // Go through all other instructions issued before this one in
-	            // the pipeline to check that this one has all the sources it
-	            // needs to start executing
-	            var canRead = true;
-	            for (var otherInst in pipeline){
-	                if (otherInst >= inst) break;
-	                if (    pipeline[otherInst].dest === pipeline[inst].src
-	                    ||  pipeline[otherInst].dest === pipeline[inst].trgt){
-	                    canRead = false;
-	                    break;
-	                }
-	            }
-	            if (canRead){
-	                try {
-    	                pipeline[inst].nextState = "read";
-    	                hardware[pipeline[inst].FU].busy = hardwareLatency[pipeline[inst].FU];
-	                    hardware[pipeline[inst].FU].inputA = getValue(pipeline[inst].src);
-    	                if (pipeline[inst].inst === "S.D"){
-    	                    hardware[pipeline[inst].FU].inputB = pipeline[inst].trgt;
-    	                }
-    	                else {
-    	                    hardware[pipeline[inst].FU].inputB = getValue(pipeline[inst].trgt);
-    	                }
-    	                hardware[pipeline[inst].FU].inst = pipeline[inst].inst;
-	                }
-	                catch (e) {
-	                    throw e+"\nInstruction:" + pipeline[inst].inst + " ";
-	                }
-	            }
-	        }
-	        // The instruction will stay in read until it's HW timer
-	        // reaches 0
-	        else if (pipeline[inst].state == "read"){
-	            if (hardware[pipeline[inst].FU].busy > 1){
-	                hardware[pipeline[inst].FU].busy--;
-	            }
-	            else {
-	                // Since no other instruction can execute as long as there
-	                // is an instruction in the pipeline using the same FU,
-	                // nothing will "execute" until the WB state
-	                pipeline[inst].nextState = "exec";
-	                hardware[pipeline[inst].FU].busy = 0;
-	            }
-	        }
-	        // Before writing the output, check for WAR (Ensure no instruction
-	        // that is waiting to read has this instruction dest as an input)
-	        else if (pipeline[inst].state == "exec"){
-	            var canWrite = true;
-	            for (var otherInst in pipeline){
-	                if (otherInst >= inst) break;
-	                if (    pipeline[inst].dest === pipeline[otherInst].src
-	                    ||  pipeline[inst].dest === pipeline[otherInst].trgt
-	                    ||  pipeline[otherInst].type === "ctrl"){
-	                    if (!pipeline[otherInst].read)
-	                        canWrite = false;
-    	                break;
-	                }
-	            }
-	            if (canWrite){
-	                pipeline[inst].nextState = "wb";
-	                var fu = hardware[pipeline[inst].FU];
-	                var result = executeInstruction(fu.inst,
-	                                                fu.inputA,
-	                                                fu.inputB,
-	                                                pipeline[inst].dest);
-	                if (pipeline[inst].type === "ctrl" && result === true){
-	                    var removed = pipeline.splice(inst+1,
-	                                                  pipeline.length-inst);
+    // Split each line into its own instruction and remove empty/commented lines
+    instList = instList.split('\n');
+    instList = instList.filter(function(inst){
+        return (inst.trim() !== '' && inst.trim()[0] !== '#');
+    });
+    instList = instList.map(function(line){
+        try {
+            return getInstructionType(line);
+        }
+        catch (e){
+            alert("Error decoding " + line);
+            return null;
+        }
+    });
+    
+    // Loop as long as IC is not at the end of the program and there are
+    // instructions in the pipeline
+    while ((IC < instList.length) || (pipeline.length > 0)){
+        // Loop through every instruction in the pipeline
+        for (var inst in pipeline){
+            // If waiting to issue, check WAW and FU
+            if (pipeline[inst].state == "waiting"){
+                // Go through all other instructions in the pipeline to see if
+                // this one can be issued
+                var canIssue = true;
+                for (var otherInst in pipeline){
+                    if (otherInst >= inst) break;
+                    if (   (pipeline[inst].dest === pipeline[otherInst].dest)
+                        || (pipeline[inst].FU === pipeline[otherInst].FU)){
+                        canIssue = false;
+                        break;
+                    }
+                }
+                if (canIssue){
+                    pipeline[inst].nextState = "issue";
+                }
+            }
+            
+            // If the instruction has all sources, it can read the variables
+            // Check for RAW
+            else if (pipeline[inst].state == "issue"){
+                // Go through all other instructions issued before this one in
+                // the pipeline to check that this one has all the sources it
+                // needs to start executing
+                var canRead = true;
+                for (var otherInst in pipeline){
+                    if (otherInst >= inst) break;
+                    if (    pipeline[otherInst].dest === pipeline[inst].src
+                        ||  pipeline[otherInst].dest === pipeline[inst].trgt){
+                        canRead = false;
+                        break;
+                    }
+                }
+                if (canRead){
+                    try {
+                        pipeline[inst].nextState = "read";
+                        // Add the latency to the HW
+                        hardware[pipeline[inst].FU].busy = hardwareLatency[pipeline[inst].FU];
+                        // Input A = source value
+                        hardware[pipeline[inst].FU].inputA = getValue(pipeline[inst].src);
+                        // Input B = target value (or mem address for s.d)
+                        if (pipeline[inst].inst === "S.D"){
+                            hardware[pipeline[inst].FU].inputB = pipeline[inst].trgt;
+                        }
+                        else {
+                            hardware[pipeline[inst].FU].inputB = getValue(pipeline[inst].trgt);
+                        }
+                        // Save the instruction in the HW too
+                        hardware[pipeline[inst].FU].inst = pipeline[inst].inst;
+                    }
+                    catch (e) {
+                        throw e+"\nInstruction:" + pipeline[inst].inst + "\n";
+                    }
+                }
+            }
+            // The instruction will stay in read until it's HW timer
+            // reaches 0
+            else if (pipeline[inst].state == "read"){
+                if (hardware[pipeline[inst].FU].busy > 1){
+                    hardware[pipeline[inst].FU].busy--;
+                }
+                else {
+                    // Since no other instruction can execute as long as there
+                    // is an instruction in the pipeline using the same FU,
+                    // nothing will "execute" until the WB state
+                    pipeline[inst].nextState = "exec";
+                    hardware[pipeline[inst].FU].busy = 0;
+                }
+            }
+            // Before writing the output, check for WAR (Ensure no instruction
+            // that is waiting to read has this instruction dest as an input)
+            // and no writing if a branch is still waiting to write
+            else if (pipeline[inst].state == "exec"){
+                var canWrite = true;
+                for (var otherInst in pipeline){
+                    if (otherInst >= inst) break;
+                    if (    pipeline[inst].dest === pipeline[otherInst].src
+                        ||  pipeline[inst].dest === pipeline[otherInst].trgt
+                        ||  pipeline[otherInst].type === "ctrl"){
+                        // if it was not a branch/control instruction and
+                        // it already read, the instruction can write
+                        if (!((pipeline[otherInst].type !== "ctrl") && (pipeline[otherInst].read !== null))){
+                            canWrite = false;
+                            break;
+                        }
+                    }
+                }
+                if (canWrite){
+                    pipeline[inst].nextState = "wb";
+                    var fu = hardware[pipeline[inst].FU];
+                    var result = executeInstruction(fu.inst, fu.inputA, fu.inputB, pipeline[inst].dest);
+                    if (pipeline[inst].type === "ctrl" && result === true){
+                        var removed = pipeline.splice(inst+1,
+                                                      pipeline.length-inst);
                         removed.forEach(function(remInstr){
                             if (remInstr.issue !== null)
                                 scoreboard.push(deepCopy(remInstr));
                         });
-	                }
-	                
-	            }
-	        }
-	    }
-	    
+                    }
+                    
+                }
+            }
+        }
+        
         // Add next element into the pipeline if there is another instruction
         // AND either (nothing is in the pipeline OR the last element in the
         // pipeline has issued)
@@ -169,43 +174,43 @@ function runScoreboard(){
             IC++;
         }
         
-	    // Update all states of instructions in the pipeline and move completed
-	    // from the pipeline to the scoreboard.
-	    for (var inst in pipeline){
-	        if (pipeline[inst].state !== pipeline[inst].nextState){
-	            pipeline[inst].state = pipeline[inst].nextState;
-	            pipeline[inst][pipeline[inst].state] = clk;
-	        }
-	    }
-	    pipeline = pipeline.filter(function(inst){
-	       if (inst.state === "wb"){
-	           scoreboard.push(inst);
-	           return false;
-	       }
-	       return true;
-	    });
-	    clk++;
-	    
-	    if (clk % 10000 == 0 && clk > instList.length*100){
-	        if (confirm("It looks like you might be in an endless loop," +
-	                    "Would you like to kill it?\n" +
-	                    "\rclk = " + clk)){
-	            return null;
-	        }
-	        
-	    }
-	    
-	}
-	// Since instructions were put in the scoreboard at different times (done at
-	// WB), they need to be sorted by issue clk cycles
-	scoreboard.sort(function(a, b){
-	   return (a.issue - b.issue);
-	});
-	printScoreboard(scoreboard);
-	printRegisterFile(intRegFile, "regFile_table", "RegFile");
-	printRegisterFile(fpRegFile, "fpRegFile_table", "FP RegFile");
-	printRegisterFile(dataMem, "dataMem_table", "Data Mem");
-	return instList;
+        // Update all states of instructions in the pipeline and move completed
+        // from the pipeline to the scoreboard.
+        for (var inst in pipeline){
+            if (pipeline[inst].state !== pipeline[inst].nextState){
+                pipeline[inst].state = pipeline[inst].nextState;
+                pipeline[inst][pipeline[inst].state] = clk;
+            }
+        }
+        pipeline = pipeline.filter(function(inst){
+           if (inst.state === "wb"){
+               scoreboard.push(inst);
+               return false;
+           }
+           return true;
+        });
+        clk++;
+        
+        if (clk % 10000 == 0 && clk > instList.length*100){
+            if (confirm("It looks like you might be in an endless loop," +
+                        "Would you like to kill it?\n" +
+                        "\rclk = " + clk)){
+                return null;
+            }
+            
+        }
+        
+    }
+    // Since instructions were put in the scoreboard at different times (done at
+    // WB), they need to be sorted by issue clk cycles
+    scoreboard.sort(function(a, b){
+       return (a.issue - b.issue);
+    });
+    printScoreboard(scoreboard);
+    printRegisterFile(intRegFile, "regFile_table", "RegFile");
+    printRegisterFile(fpRegFile, "fpRegFile_table", "FP RegFile");
+    printRegisterFile(dataMem, "dataMem_table", "Data Mem");
+    return instList;
 }
 
 /**
@@ -215,14 +220,14 @@ function runScoreboard(){
 *
 */
 function getHardwareLatencies(hardwareLatency){
-	hardwareLatency.fpAdder =
-	                    parseInt(document.getElementById("fpAdder_clks").value);
-	hardwareLatency.fpMult =
-	                    parseInt(document.getElementById("fpMult_clks").value);
-	hardwareLatency.fpDiv =
-	                    parseInt(document.getElementById("fpDiv_clks").value);
-	hardwareLatency.integer =
-	                    parseInt(document.getElementById("integer_clks").value);
+    hardwareLatency.fpAdder =
+                        parseInt(document.getElementById("fpAdder_clks").value);
+    hardwareLatency.fpMult =
+                        parseInt(document.getElementById("fpMult_clks").value);
+    hardwareLatency.fpDiv =
+                        parseInt(document.getElementById("fpDiv_clks").value);
+    hardwareLatency.integer =
+                        parseInt(document.getElementById("integer_clks").value);
 }
 
 /**
@@ -232,53 +237,53 @@ function getHardwareLatencies(hardwareLatency){
 *       instruction - trimmed instruction line from assembly code
 */
 function getInstructionType(instruction){
-	// Make each element uppercase and remove any whitespace on the ends
-	instruction = instruction.toUpperCase();
-	var parsed = instruction.trim().split(/[\s,]+/);
-	var instructionObject;
-	// Memory Instruction
-	if (parsed[0] == "L.D"){
-		instructionObject = {type:"mem", dest:parsed[1], src:parsed[2],
-		                     trgt:null, FU:"integer"};
-	}
-	else if (parsed[0] == "S.D"){
-	    var regVal = parsed[2].match(/(\$\d+)/);
-		instructionObject = {type:"mem", dest:regVal[0], src:parsed[1],
-		                     trgt:parsed[2], FU:"integer"};
-	}
-	// Control Instruction
-	else if ((parsed[0] == "BEQ") || (parsed[0] == "BNE")){
-		instructionObject = {type:"ctrl", src:parsed[1], trgt:parsed[2],
-		                     dest:parsed[3], FU:"integer"};
-	}
-	// ALU Instruction
-	else {
-		if (parsed[0][parsed[0].length-1] == 'I'){
-			instructionObject = {type:"alu_i", src:parsed[2], trgt:parsed[3],
-			                     dest:parsed[1], FU:"integer"};
-		}
-		else if (parsed[0].substring(parsed[0].length-2) == ".D"){
-			instructionObject = {type:"alu_f", src:parsed[2], trgt:parsed[3],
-			                     dest:parsed[1], FU:"integer"};
-			if (parsed[0].match(/SUB|ADD/)) instructionObject.FU = "fpAdder";
-			else if (parsed[0].match(/MULT/)) instructionObject.FU = "fpMult";
-			else if (parsed[0].match(/DIV/)) instructionObject.FU = "fpDiv";
-			else {
-			    throw ("Unknown Instruction: " + instruction);
-			}
-		}
-		else{
-			instructionObject = {type:"alu_r", src:parsed[2], trgt:parsed[3],
-			                     dest:parsed[1], FU:"integer"};
-		}
-	}
-	instructionObject.inst = parsed[0];
-	instructionObject.issue = null;
-	instructionObject.read = null;
-	instructionObject.exec = null;
-	instructionObject.wb = null;
-	instructionObject.state = "waiting";
-	instructionObject.nextState = instructionObject.state;
+    // Make each element uppercase and remove any whitespace on the ends
+    instruction = instruction.toUpperCase();
+    var parsed = instruction.trim().split(/[\s,]+/);
+    var instructionObject;
+    // Memory Instruction
+    if (parsed[0] == "L.D"){
+        instructionObject = {type:"mem", dest:parsed[1], src:parsed[2],
+                             trgt:null, FU:"integer"};
+    }
+    else if (parsed[0] == "S.D"){
+        var regVal = parsed[2].match(/(\$\d+)/);
+        instructionObject = {type:"mem", dest:regVal[0], src:parsed[1],
+                             trgt:parsed[2], FU:"integer"};
+    }
+    // Control Instruction
+    else if ((parsed[0] == "BEQ") || (parsed[0] == "BNE")){
+        instructionObject = {type:"ctrl", src:parsed[1], trgt:parsed[2],
+                             dest:parsed[3], FU:"integer"};
+    }
+    // ALU Instruction
+    else {
+        if (parsed[0][parsed[0].length-1] == 'I'){
+            instructionObject = {type:"alu_i", src:parsed[2], trgt:parsed[3],
+                                 dest:parsed[1], FU:"integer"};
+        }
+        else if (parsed[0].substring(parsed[0].length-2) == ".D"){
+            instructionObject = {type:"alu_f", src:parsed[2], trgt:parsed[3],
+                                 dest:parsed[1], FU:"integer"};
+            if (parsed[0].match(/SUB|ADD/)) instructionObject.FU = "fpAdder";
+            else if (parsed[0].match(/MULT/)) instructionObject.FU = "fpMult";
+            else if (parsed[0].match(/DIV/)) instructionObject.FU = "fpDiv";
+            else {
+                throw ("Unknown Instruction: " + instruction);
+            }
+        }
+        else{
+            instructionObject = {type:"alu_r", src:parsed[2], trgt:parsed[3],
+                                 dest:parsed[1], FU:"integer"};
+        }
+    }
+    instructionObject.inst = parsed[0];
+    instructionObject.issue = null;
+    instructionObject.read = null;
+    instructionObject.exec = null;
+    instructionObject.wb = null;
+    instructionObject.state = "waiting";
+    instructionObject.nextState = instructionObject.state;
     return instructionObject;
 }
 
@@ -310,8 +315,8 @@ function getValue(location){
     }
     var parsedInput = location.match(/(\d*)\(\$(\d)\)/);
     if (parsedInput){
-        index = intRegFile[parsedInput[2]];
-        offset = parsedInput[1];
+        index = parseInt(intRegFile[parsedInput[2]]);
+        offset = parseInt(parsedInput[1]);
         return (parseInt(dataMem[index+offset]) || 0);
     }
     
@@ -368,8 +373,7 @@ function setValue(location, val){
  */
 function executeInstruction(inst, srcVal, trgtVal, destLoc){
     if (inst === "L.D"){
-        var fromMem = dataMem[srcVal];
-        return setValue(destLoc, fromMem);
+        return setValue(destLoc, srcVal);
     }
     if (inst === "S.D"){
         return setValue(trgtVal, srcVal);
