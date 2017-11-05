@@ -5,7 +5,7 @@ Written by: Jacob Schwell
 --------------------------------------
 -------------Set Up-------------------
 --------------------------------------
-Note: This program was tested on Chrome in ChromeOS and Firefox on Ubuntu
+Note: This program was tested on Chrome in ChromeOS, Firefox on Ubuntu, and Chrome on Windows 8.1,  but should work on any OS and browser capable of running Javascript.
 
 1) Since this program uses Javascript and HTML, so it does not need to be compiled. 
 2) Ensure the files index.html, scoreboard.js, and README.txt are all in the same directory.
@@ -72,11 +72,11 @@ SUB.I $1, $1, $1
 SUB.I $2, $1, $1
 ADD.I $1, $1, #16
 L.D F9, 1($1)
-MULT.D F0,	F1,	F0
-ADD.D F4,	F0,	F2
+MULT.D F0, F1, F0
+ADD.D F4, F0, F2
 S.D F4, 0($2)
 ADD.I $2, $2, #8
-BNE	$1, $2, #4
+BNE $1, $2, #4
 DIV.D F11, F9, F9
 MULT.D F8, F8, F8
 L.D F4, 1($2)
