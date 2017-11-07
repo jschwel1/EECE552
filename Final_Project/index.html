@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<!-- This is the HTML file to be used with scoreboard.js -->
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Scoreboarding</title>
+</head>
+<body>
+	<script src="scoreboard.js"></script>
+    <h1>EECE 552 Project 1: Scoreboarding</h1>
+    <a href="./README.txt" target="_blank">README/Instructions</a><br><br>
+    <!-- Table used to get input for latencies of the different Functional Units -->
+    <div id="inputs" width="300px" style="float: left; padding: 50px 50px 50px 50px">
+		<table>
+			<tr>
+			    <td>
+			        FP Adder clks
+			    </td>
+			    <td>
+	            	<textarea id="fpAdder_clks" rows="1" cols="10" maxlength="10">2</textarea>
+	            </td>
+	        </tr>
+	        <tr>
+			    <td>
+			        FP Multiplier clks
+			    </td>
+	            <td>
+	            	<textarea id="fpMult_clks" rows="1" cols="10" maxlength="10">10</textarea>
+	            </td>
+	        </tr>
+	        <tr>
+			    <td>
+			        FP Divider clks
+			    </td>
+	            <td>
+	            	<textarea id="fpDiv_clks" rows="1" cols="10" maxlength="10">40</textarea>
+	            </td>
+	        </tr>
+	        <tr>
+			    <td>
+			        Integer Unit clks
+			    </td>
+	            <td>
+	            	<textarea id="integer_clks" rows="1" cols="10" maxlength="10">1</textarea>
+	            </td>
+	        </tr>
+	    </table>
+	    <!-- Instruction Input -->
+	    <h2>Intructions:</h2><br>
+		<textarea id="instruction_input" rows="15" cols="50"></textarea>
+		<br>
+		<button onclick="startScoreboard()">Run</button>
+	</div>
+	<!-- Tables to display the scoreboard and FP register, integer register, and data memory to be build in the JavaScript code-->
+	<div id="scoreboard_div" width="300px" style="float: left; padding: 50px 50px 50px 50px">
+		<h2>Scoreboard:</h2>
+    	<table id="scoreboard_table" border="1px" padding="5px">
+    		<tr>
+    			<td>Tables will generate when scoreboard is run</td>
+    		</tr>
+    	</table>
+    </div>
+    <div id="memory_div" width="300px" style="float: left; padding: 50px 50px 50px 50px">
+    	<h2>Memory:</h2>
+		<table id="fpRegFile_table" border="1px" padding="5px" style="float: left;">
+			<tr>
+				<td>Tables will generate when scoreboard is run</td>
+			</tr>
+		</table>
+		<table id="regFile_table" border="1px" padding="5px" style="float: left;"></table>
+		<table id="dataMem_table" border="1px" padding="5px" style="float: left;"></table>
+	</div>
+</body>
+</html>
