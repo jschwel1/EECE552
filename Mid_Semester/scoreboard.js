@@ -26,7 +26,7 @@ function startScoreboard(){
 }
 
 /**
-* function runScoreboard()
+* Function: runScoreboard()
 * This function reads the parameters to get the clock cycles required
 * for each Functional Unit, then parses the code in order to use it to build
 * the scoreboard and display it in a table.
@@ -51,8 +51,7 @@ function runScoreboard(){
             return getInstructionType(line);
         }
         catch (e){
-            alert("Error decoding " + line);
-            return null;
+            throw e + "\nError decoding " + line;
         }
     });
     
@@ -112,11 +111,11 @@ function runScoreboard(){
                         hardware[pipeline[inst].FU].inst = pipeline[inst].inst;
                     }
                     catch (e) {
-                        throw e+"\nInstruction:" + pipeline[inst].inst + "\n";
+                        throw e + "\nInstruction:" + pipeline[inst].inst + "\n";
                     }
                 }
             }
-            // The instruction will stay in read until it's HW timer
+            // The instruction will stay in read until its HW timer
             // reaches 0
             else if (pipeline[inst].state == "read"){
                 if (hardware[pipeline[inst].FU].busy > 1){
@@ -152,7 +151,8 @@ function runScoreboard(){
                     pipeline[inst].nextState = "wb";
                     var fu = hardware[pipeline[inst].FU];
                     var result = executeInstruction(fu.inst, fu.inputA, fu.inputB, pipeline[inst].dest);
-                    if (pipeline[inst].type === "ctrl" && result === true){
+                    // If a branch was taken, remove everything in the pipeline after it
+					if (pipeline[inst].type === "ctrl" && result === true){
                         var removed = pipeline.splice(inst+1, pipeline.length-inst);
                         removed.forEach(function(remInstr){
                             // Of the instructions removed from the pipeline, make sure
@@ -292,7 +292,7 @@ function getInstructionType(instruction){
 }
 
 /**
- * Function: getValue(input)
+ * Function: getValue
  * This function returns the number stored in a register file
  * Parameters:
  *      input - string starting with F, $, or # representing the index in the
@@ -329,7 +329,7 @@ function getValue(location){
 }
 
 /**
- * Function: setValue(location, val)
+ * Function: setValue
  * This function sets location in the register files/data memory to val. Note
  * this function will make any floating point value an integer before putting it
  * int the integer register file.
