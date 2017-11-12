@@ -1,3 +1,8 @@
+/**
+*	File: scoreboard.js
+*	Written by: Jacob Schwell
+**/
+
 // Global variables that are accessed by multiple functions
 var fpRegFile = Array(32).fill(0.0);
 var intRegFile = Array(32).fill(0);
