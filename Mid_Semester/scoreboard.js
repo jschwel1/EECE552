@@ -183,13 +183,16 @@ function runScoreboard(){
                 pipeline[inst][pipeline[inst].state] = clk;
             }
         }
-        pipeline = pipeline.filter(function(inst){
-           if (inst.state === "wb"){
-               scoreboard.push(inst);
-               return false;
-           }
-           return true;
-        });
+        
+        // Only allow one writeback per clk cycle
+        for (var inst in pipeline){
+            if (pipeline[inst].state == "wb"){
+                var written = pipeline.splice(inst, 1)[0];
+                written.wb = clk;
+                scoreboard.push(written);
+                break;
+            }
+        }
         clk++;
         
         if (clk % 10000 == 0 && clk > instList.length*100){
