@@ -7,8 +7,8 @@ Written by: Jacob Schwell
 --------------------------------------
 Note: This program was tested on Chrome in ChromeOS, Firefox on Ubuntu, and Chrome on Windows 8.1,  but should work on any OS and browser capable of running Javascript.
 
-1) Since this program uses Javascript and HTML, so it does not need to be compiled. 
-2) Ensure the files index.html, scoreboard.js, and README.txt are all in the same directory.
+1) Since this program uses Javascript and HTML, it does not need to be compiled. 
+2) Ensure the files index.html, scoreboard.js, README.txt, and README.html are all in the same directory.
 3) From the file browser, open the index.html file in a web browser.
 4) Everything should load and the use-instructions below can be used to enter instructions and start the scoreboard.
 

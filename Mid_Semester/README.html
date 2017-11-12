@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+	<p>
+		Computer Design, EECE 552 <br>
+		Mid-semester project: Scoreboarding program<br>
+		Written by: Jacob Schwell<br>
+	</p>
+	
+	<h2><u>Setup</u></h2>
+	<p>
+		Note: This program was tested on Chrome in ChromeOS, Firefox on Ubuntu, and Chrome on Windows 8.1,  but should work on any OS and browser capable of running Javascript.<br>
+	<ol>
+		<li>Since this program uses Javascript and HTML, it does not need to be compiled. </li>
+		<li>Ensure the files index.html, scoreboard.js, README.txt and README.html are all in the same directory. </li>
+		<li>From the file browser, open the index.html file in a web browser.</li>
+		<li>Everything should load and the use-instructions below can be used to enter instructions and start the scoreboard.</li>
+	</ol>
+	</p>
+		
+	<h2><u>Available Instructions</u></h2>
+	<p>
+		<ul>
+			<li><strong>Memory:</strong><br>
+			L.D Fd, offset($a) 	| Fd = DM(offset + $a)<br>
+			S.D Fs, offset($a)	| DM(offset + $a) = Fs<br></li>
+
+			<li><strong>Control:</strong><br>
+			BEQ $s, $t, dest 	| if ($s == $t) IC = dest<br>
+			BNE $s, $t, dest 	| if ($s != $t) IC = dest<br></li>
+
+			<li><strong>Arithmetic:</strong><br>
+			ADD $d, $s, $t		| $d = $s + $t<br>
+			ADDI $d, $s, #imm	| $d = $s + imm<br>
+			ADD.D Fd, Fs, Ft	| Fd = Fs + Ft<br>
+			SUB.D Fd, Fs, Ft	| Fd = Fs - Ft<br>
+			SUBI $d, $s, $t		| $d = $s - $t<br>
+			MULT.D Fd, Fs, Ft	| Fd = Fs * Fd<br>
+			DIV.D Fd, Fs, Ft	| Fd = Fs / Ft<br></li>
+		</ul>
+	</p>
+	
+	<h2><u>Available Registers</u></h2>
+		<ul>
+			<li>Floating point registers Fd, d={0,...,31}</li>
+			<li>Integer registers $d, d={0,...,31}</li>
+			<li>Data Memory: offset($d)=$d+offset -- available addresses={0,...,18}</li>
+			<li>Immediate Value: #v, v=any immediate value</li>
+		</ul>
+		Note: $0 acts as any other register, rather than only storing 0		
+	
+	<h2><u>How to Use</u></h2>
+		<p>
+		<ol>
+			<li>Enter the latencies for each of the fuctional units</li>
+			<li>Enter Assembly instructions (from those listed above) with their required parameters.
+				<ul>
+					<li>Commas can be used, but are not necessary</li>
+					<li>The 'F' for floating point registers is case-insensitive, to use one use Fn, where 0 <= n <= 31</li>
+					<li>For an integer register, use $n, where 0 <= n <= 31</li>
+					<li>For a data memory location, use O($n), where O is any offset and n is any register holding the base address</li>
+					<li>For an immediate value, the value must be preceded by a '#'</li>
+					<li>Branch instructions require an absolute address to jump to, not a relative one. The address can be found in a register or be an immediate value.</li>
+					<li>If the program does not seem to run, double check that all instructions are correctly spelled correctly. If it is a caught error, an alert will pop up to inform the user of what happened.</li>
+				</ul>
+			</li>
+			<li>To run the code, click the run button. The scoreboard and memory tables will generate at the bottom of the page upon completion.</li>
+		</ol>
+		Note: The register files will initialize to all 0s on page load, but will not be reset between runs, so make sure to only use a register if you know what is in it. Also, branch instructions will always predict not taken, and will use up a cycle to flush out the pipeline if it is taken. <br><br>
+		Comments:<br>
+		The code will only read the necessary parameters for each instruction, so any additional text will be ignored and can be used for comments 
+		<ul>
+			<li>E.g. ADD.D F1 F2 F3 ; this is a comment.</li>
+			<li>Comment/blank lines are ignored by the parser, so they do not count towards branch destinations.</li>
+		</ul>
+		</p>
+	<h2><u>Sample Code</u></h2>
+	<p>	
+		SUBI $1, $1, $1 <br>
+		SUBI $2, $1, $1 <br>
+		ADDI $1, $1, #16 <br>
+		L.D F9, 1($1) <br>
+		MULT.D F0, F1, F0 <br>
+		ADD.D F4, F0, F2 <br>
+		S.D F4, 0($2) <br>
+		ADDI $2, $2, #8 <br>
+		BNE $1, $2, #4 <br>
+		DIV.D F11, F9, F9 <br>
+		MULT.D F8, F8, F8 <br>
+		L.D F4, 1($2) <br>
+		DIV.D F10, F4, F4 <br>
+	</p>
+</body>
+</html>
+
+
