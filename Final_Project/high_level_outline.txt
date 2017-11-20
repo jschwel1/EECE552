@@ -1,0 +1,31 @@
+// OUTLINE
+
+// ISSUE:
+// IF: space in corresponding RS and in ROB
+// THEN: update contol entries to indicate buffers in use
+//       ROB slot sent to RS to tag result
+// ELSE: stall
+
+// EXECUTE:
+// IF: All operands ready
+// THEN: Read operands and start execution
+// NOTE: Stores on need base register
+// NOTE: Loads cannot access memory if there is a store in the ROB that needs
+//       to write to that destination
+// ELSE: Monitor Common Data Bus (CDB)
+
+// WRITE RESULT:
+// When result is ready, write it on CDB (W/ ROB tag)
+// Mark RS as available
+// NOTE: for stores: if value is available, it is written to the value
+//       entry in the ROB
+
+// COMMIT:
+// IF: normal instruction is at the head of the ROB & its result is ready
+// THEN: Update register
+//       (if store, mem location is updated)
+// IF: branch with incorrect prediciton reaches head of ROB
+// THEN: ROB is flushed and execution is restarted at corect successor branch
+// IF: branch with correct prediction is at head of ROB
+// THEN: continue
+// QUESTION: If branch at head is correct, should it take a clk cycle to commit it, or should it skip and commit next instruction?

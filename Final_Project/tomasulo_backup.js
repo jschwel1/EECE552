@@ -1,6 +1,3 @@
-/***************************************************/
-/********** Class Definitions **********************/
-/***************************************************/
 /**
  * Class: ReservationStation_t
  * Description: This class defines a reservation station for a particular
@@ -18,9 +15,9 @@ class ReservationStation_t {
     }
     addInstruction(inst){
         if (inst.FU != this.type){
-            throw new Error("Wrong Reservation Station: This="+this.type+", Inst="+inst.FU);
+            throw "Wrong Reservation Station: This="+this.type+", Inst="+inst.FU;
         }
-        if (this.rs.length == this.maxSize){
+        if (this.rs.length() == this.maxSize){
             return false;
         }
         else {
@@ -29,7 +26,7 @@ class ReservationStation_t {
         }
     }
     isFull(){
-        return (this.rs.length == this.maxSize);
+        return (this.rs.length() == this.maxSize);
     }
     cycleStation(){
         if (pipelined){
@@ -50,16 +47,12 @@ class ReservationStation_t {
         }
     }
 }
-/**
- *  The reorder buffer in this program is an expansion of the actual
- *  reoder buffers in real hardware. This one acts similar to a pipeline
- *  class, since it hold each instruction and all its data (unlike a real one
- *  that would only hold the instruction, destination, and value).
- **/
+
 class ReorderBuffer {
-    element(inst){
+    element(inst, dest){
         return{
             inst: inst,
+            dest: dest,
             val: null,
             ready: false
         }
@@ -71,9 +64,9 @@ class ReorderBuffer {
     isFull(){
         return (this.buffer.length == this.maxSize);
     }
-    addInstr(inst){
-        var e = this.element(inst);
-        if (!this.isFull()) this.buffer.push(e);
+    addInstr(inst, dest){
+        var e = element(inst, dest);
+        if (!isFull()) this.buffer.push(e);
         return e;
     }
     getInst(n){
@@ -82,18 +75,15 @@ class ReorderBuffer {
     getBuffLength(){
         return this.buffer.length;
     }
-    getLastElement(){
-        return this.getInst(this.getBuffLength()-1);
-    }
     clearBranch(){
      for (var element in this.buffer){
         if (!(   element.ready
-             &&    ((element.inst.inst === 'BNE')
-                 || (element.inst.inst === 'BEQ')))) continue;
+             &&    ((element.inst === 'BNE')
+                 || (element.inst === 'BEQ')))) continue;
          
-            if (        ((element.inst.inst === 'BEQ')
+            if (        ((element.inst === 'BEQ')
                     &&  (element.val === true))
-                ||      ((element.inst.inst === 'BNE' )
+                ||      ((element.inst === 'BNE' )
                     &&  (element.val === false))){
                 return this.buffer.splice(this.buffer.length-element+1);
             }
@@ -106,14 +96,7 @@ class ReorderBuffer {
         }
         return null;
     }
-    toString(){
-        return this.buffer;
-    }
 }
-
-/***************************************************/
-/**************** Global Variables *****************/
-/***************************************************/
 
 // Global variables that are accessed by multiple functions
 var fpRegFile = Array(32).fill(0.0);
@@ -121,11 +104,6 @@ var intRegFile = Array(32).fill(0);
 var dataMem = [45, 12, 0, 0, 10, 135, 254, 127, 18, 4,
                55, 8, 2, 98, 13, 5, 233, 158, 167];
 var IC = 0;
-
-/***************************************************/
-/**************** Funtion Declarations *************/
-/***************************************************/
-
 
 /**
  * Function: startScoreboard()
@@ -138,8 +116,197 @@ function startScoreboard(){
     }
     catch (e){
         alert("Error: " + e + "\n");
-        console.log(e.stack);
     }
+}
+
+/**
+* function runScoreboard()
+* This function reads the parameters to get the clock cycles required
+* for each Functional Unit, then parses the code in order to use it to build
+* the scoreboard and display it in a table.
+*/
+function runScoreboard(){
+    // Setup
+    IC = 0;
+    var clk = 0;
+    var pipeline = [];
+    var instList = document.getElementById('instruction_input').value;
+    var scoreboard = [];
+    var ROB = new ReorderBuffer(parseInt(document.getElementById('rob_slots').value));
+    var hardware = getHardware();
+    
+    // Split each line into its own instruction and remove empty/commented lines
+    instList = instList.split('\n');
+    instList = instList.filter(function(inst){
+        return (inst.trim() !== '' && inst.trim()[0] !== '#');
+    });
+    instList = instList.map(function(line){
+        try {
+            return getInstructionType(line);
+        }
+        catch (e){
+            throw "\nError decoding " + line + " :\n " + e + '\n';
+        }
+    });
+    
+    // Loop as long as IC is not at the end of the program and there are
+    // instructions in the ROB
+    while ((IC < instList.length) || (ROB.length > 0)){
+        // Loop through every instruction in the pipeline
+        for (var inst in ROB){
+            // Although Tomasulo's combines read and execute, they will remain
+            // separate here to maintain simplicity
+            if (ROB[inst].state == "issue"){
+                var hasSrc = true;
+                var hasTrgt = true;
+                for (var otherInst = inst-1; otherInst >= 0; otherInst--){
+                    if (ROB[otherInst].dest === ROB[inst].src){
+                        if (ROB[otherInst].ready){
+                            ROB[inst]
+                        }
+                    }
+                    
+                    if (ROB[otherInst].dest === ROB[inst].trgt){
+                        canRead = false;
+                        break;
+                    }
+                }
+                if (canRead){
+                    try {
+                        ROB[inst].nextState = "read";
+                        // Add the latency to the HW
+                        hardware[ROB[inst].FU].busy = hardwareLatency[pipeline[inst].FU];
+                        // Input A = source value
+                        hardware[pipeline[inst].FU].inputA = getValue(pipeline[inst].src);
+                        // Input B = target value (or mem address for s.d)
+                        if (pipeline[inst].inst === "S.D"){
+                            hardware[pipeline[inst].FU].inputB = pipeline[inst].trgt;
+                        }
+                        else {
+                            hardware[pipeline[inst].FU].inputB = getValue(pipeline[inst].trgt);
+                        }
+                        // Save the instruction in the HW too
+                        hardware[pipeline[inst].FU].inst = pipeline[inst].inst;
+                    }
+                    catch (e) {
+                        throw e+"\nInstruction:" + pipeline[inst].inst + "\n";
+                    }
+                }
+            }
+            // The instruction will stay in read until it's HW timer
+            // reaches 0
+            else if (pipeline[inst].state === "read"){
+                if (hardware[pipeline[inst].FU].busy > 1){
+                    hardware[pipeline[inst].FU].busy--;
+                }
+                else {
+                    // Since no other instruction can execute as long as there
+                    // is an instruction in the pipeline using the same FU,
+                    // nothing will "execute" until the WB state
+                    pipeline[inst].nextState = "exec";
+                    hardware[pipeline[inst].FU].busy = 0;
+                }
+            }
+            //////////////////////////////////////////////////////////////////
+            //////////////////////////////////////////////////////////////////
+            //////////////////////////////////////////////////////////////////
+            //////////////////////////////////////////////////////////////////
+            //////////////////////////////////////////////////////////////////
+            // Before writing the output, check for WAR (Ensure no instruction
+            // that is waiting to read has this instruction dest as an input)
+            // and no writing if a branch is still waiting to write
+            else if (pipeline[inst].state == "exec"){
+                var canWrite = true;
+                for (var otherInst in pipeline){
+                    if (otherInst >= inst) break;
+                    if (    pipeline[inst].dest === pipeline[otherInst].src
+                        ||  pipeline[inst].dest === pipeline[otherInst].trgt
+                        ||  pipeline[otherInst].type === "ctrl"){
+                        // if it was not a branch/control instruction and
+                        // it already read, the instruction can write
+                        if (!((pipeline[otherInst].type !== "ctrl") && (pipeline[otherInst].read !== null))){
+                            canWrite = false;
+                            break;
+                        }
+                    }
+                }
+                if (canWrite){
+                    pipeline[inst].nextState = "wb";
+                    var fu = hardware[pipeline[inst].FU];
+                    var result = executeInstruction(fu.inst, fu.inputA, fu.inputB, pipeline[inst].dest);
+                    // Flush ROB and add to scoreboard (the scoreboard will be sorted by issue at the end)
+                    if (pipeline[inst].type === "ctrl" && result === true){
+                        var removed = pipeline.splice(inst+1, pipeline.length-inst);
+                        removed.forEach(function(remInstr){
+                            // Of the instructions removed from the pipeline, make sure
+                            // they actually issued before putting onto the scoreboard
+                            if (remInstr.issue !== null)
+                                scoreboard.push(deepCopy(remInstr));
+                        });
+                    }
+                    
+                }
+            }
+        }
+            
+        // Add next element into the pipeline if there is another instruction
+        // AND either (nothing is in the pipeline OR the last element in the
+        // pipeline has issued)
+        if (((instList[IC]) && (ROB.getBuffLength === 0))
+            || (ROB.getInst(ROB.getBuffLength).issue !== null)){
+                
+            var canIssue = ((!hardware[ROB[inst].FU].isFull())
+                            && (!ROB.isFull()));
+            if (canIssue){
+                ROB.push(deepCopy(instList[IC]));
+                ROB[ROB.length-1].nextState = "issue";
+                IC++;
+            }
+        }
+        
+        // Update all states of instructions in the ROB and move completed
+        // from the ROB to the scoreboard.
+        for (var inst in ROB){
+            if (ROB[inst].state !== ROB[inst].nextState){
+                ROB[inst].state = ROB[inst].nextState;
+                ROB[inst][ROB[inst].state] = clk;
+            }
+        }
+        // Only allow one commit per clk cycle
+        var committedInst = ROB.removeNext();
+        if (committedInst !== null){
+            scoreboard.push(committedInst);
+        }
+        for (var inst in ROB){
+            if (ROB[inst].ready){
+                var written = pipeline.splice(inst, 1)[0];
+                written.wb = clk;
+                scoreboard.push(written);
+                break;
+            }
+        }
+        clk++;
+        
+        if (clk % 10000 == 0 && clk > instList.length*100){
+            if (confirm("It looks like you might be in an infinite loop, " +
+                        "Would you like to kill it?\n" +
+                        "\rclk = " + clk)){
+                return null;
+            }
+            
+        }
+        
+    }
+    // Since instructions were put in the scoreboard at different times (done at
+    // WB), they need to be sorted by issue clk cycles
+    scoreboard.sort(function(a, b){
+       return (a.issue - b.issue);
+    });
+    printScoreboard(scoreboard);
+    printRegisterFile(intRegFile, "regFile_table", "RegFile");
+    printRegisterFile(fpRegFile, "fpRegFile_table", "FP RegFile");
+    printRegisterFile(dataMem, "dataMem_table", "Data Mem");
+    return instList;
 }
 
 /**
@@ -148,8 +315,8 @@ function startScoreboard(){
 * for each type of hardware. Since this project only uses one of each type,
 *
 */
-function getHardware(hardware){
-    hardware = [];
+function getHardware(){
+    var hardware = [];
     hardware.push(new ReservationStation_t(
                         'fpAdder',
                         parseInt(document.getElementById('fpAdder_rs').value),
@@ -223,7 +390,7 @@ function getInstructionType(instruction){
             else if (parsed[0].match(/MULT/)) instructionObject.FU = "fpMult";
             else if (parsed[0].match(/DIV/)) instructionObject.FU = "fpDiv";
             else {
-                throw new Error ("Unknown Instruction: " + instruction);
+                throw ("Unknown Instruction: " + instruction);
             }
         }
         else{
@@ -274,7 +441,7 @@ function getValue(location){
         return (parseInt(dataMem[index+offset]) || 0);
     }
     
-    throw new Error("Could not obtain a value from \"" + location +
+    throw ("Could not obtain a value from \"" + location +
            "\". Check that is is formatted correctly (see README)");
 }
 
@@ -403,7 +570,7 @@ function printScoreboard(sb){
     }
     
     var headers = ["Inst", "Dest", "Src", "Trgt", "Issue",
-                   "Exec", "WB", "Commit"];
+                   "Read", "Exec", "WB"];
     var row = document.createElement("tr");
     for (var h in headers){
         var header = document.createElement("th");
@@ -465,108 +632,3 @@ function printRegisterFile(regFile, htmlTable, title){
         rfTable.appendChild(row);
     }
 }
-
-
-
-/***************************************************/
-/**************** Scoreboarding loop ***************/
-/***************************************************/
-
-/**
-* function runScoreboard()
-* This function reads the parameters to get the clock cycles required
-* for each Functional Unit, then parses the code in order to use it to build
-* the scoreboard and display it in a table.
-*/
-function runScoreboard(){
-    // Setup
-    IC = 0;
-    var clk = 0;
-    var pipeline = [];
-    var instList = document.getElementById('instruction_input').value;
-    var scoreboard = [];
-    var ROB = new ReorderBuffer(parseInt(document.getElementById('rob_slots').value));
-    var hardware = getHardware();
-    
-    // Split each line into its own instruction and remove empty/commented lines
-    instList = instList.split('\n');
-    instList = instList.filter(function(inst){
-        return (inst.trim() !== '' && inst.trim()[0] !== '#');
-    });
-    instList = instList.map(function(line){
-        try {
-            return getInstructionType(line);
-        }
-        catch (e){
-            throw new Error("\nError decoding " + line + " :\n " + e + '\n');
-        }
-    });
-    
-    // Loop as long as IC is not at the end of the program and there are
-    // instructions in the ROB
-    while ((IC < instList.length) || (ROB.length > 0)){
-        
-        // Loop through instructions in the ROB to and update their state as necessary
-        for (var inst in ROB.buffer){
-            /****** NOTE: If instructions can read the same cycle a register is written to,
-             *            check instructions next states as well?
-             */
-            // read/execute
-            
-            // Writeback
-            
-        }
-    
-    
-        
-        // Add next element into the pipeline if there is another instruction
-        // AND either (nothing is in the pipeline OR the last element in the
-        // pipeline has issued)
-        if (instList[IC] && !ROB.isFull()){
-            var fu = hardware.filter(function(unit){
-                return (unit.type === instList[IC].FU)
-            });
-            console.log("Checking slots in " + fu);
-            if (!fu[0].isFull()){
-                ROB.addInstr(instList[IC]);
-                console.log("ROB:" + ROB.toString());
-                console.log(ROB.getLastElement())
-                ROB.getLastElement().inst.nextState = "issue";
-                IC++;
-            }
-            
-            console.log("---------- IC = " + IC + " -------------");
-            console.log(ROB);
-            console.log("----------------------------------------");
-            
-        }
-        
-        // Update all states of instructions in the ROB and move completed
-        // from the ROB to the scoreboard.
-        for (var inst in ROB.buffer){
-            if (ROB.getInst(inst).inst.state !== ROB.getInst(inst).inst.nextState){
-                ROB.getInst(inst).inst.state = ROB.getInst(inst).inst.nextState;
-                var newState = ROB.getInst(inst).inst.state;
-                ROB.getInst(inst).inst[newState] = clk;
-            }
-        }
-        
-        // Only allow one commit per clk cycle
-        var committedInst = ROB.removeNext();
-        if (committedInst !== null){
-            scoreboard.push(committedInst);
-        }
-        clk++;
-        
-        if (clk % 10000 == 0 && clk > instList.length*100){
-            if (confirm("It looks like you might be in an infinite loop, " +
-                        "Would you like to kill it?\n" +
-                        "\rclk = " + clk)){
-                return null;
-            }
-            
-        }
-    }
-    
-}
-    
