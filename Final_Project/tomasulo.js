@@ -25,29 +25,53 @@ class ReservationStation_t {
         }
         else {
             this.rs.push({inst:inst.inst, src:inst.src, trgt:inst.trgt,
-                          cycle:getLatency(this.type), ready:false});
+                          inputA:null, inputB:null, result: null,
+                          cycle:this.latency-1, ready:false, written:false,});
+            // for single cycle instructions, they will be ready on the next cycle
+            if (this.rs[this.rs.length-1].cycle <= 0){
+                this.rs[this.rs.length-1].ready = true;
+            }
+            return this.rs[this.rs.length-1];
         }
     }
     isFull(){
         return (this.rs.length == this.maxSize);
     }
+    getElement(i){
+        return this.rs[i];
+    }
     cycleStation(){
-        if (pipelined){
-            this.rs.foreach(function(rsSlot){
-                if (rsSlot.cycle > 0)
-                    rsSlot.cycle--;
-                else
-                    rsSlot.ready = true;
+        if (this.pipelined){
+            this.rs.forEach(function(rsSlot){
+                if (rsSlot.inputA !== null && rsSlot.inputB !== null){
+                    if (rsSlot.cycle > 0)
+                        rsSlot.cycle--;
+                    if (rsSlot.cycle === 0)
+                        rsSlot.ready = true;
+                }
+                    
             });
         }
         else {
             if (this.rs.length > 0){
-                if (this.rs[0].cycle > 0)
-                    this.rs[0].cycle--;
-                else
-                    this.rs[0].ready = true;
+                if (this.rs[0].inputA !== null && this.rs[0].inputB !== null){
+                    if (this.rs[0].cycle > 0)
+                        this.rs[0].cycle--;
+                    if (this.rs[0].cycle === 0)
+                        this.rs[0].ready = true;
+                }
             }
         }
+    }
+    removeWritten(){
+        this.rs = this.rs.filter(function(element){
+            return !element.written;
+        });
+    }
+    remove(elem){
+        this.rs = this.rs.filter(function(element){
+            return elem !== element;
+        });
     }
 }
 /**
@@ -57,13 +81,6 @@ class ReservationStation_t {
  *  that would only hold the instruction, destination, and value).
  **/
 class ReorderBuffer {
-    element(inst){
-        return{
-            inst: inst,
-            val: null,
-            ready: false
-        }
-    }
     constructor(maxSize){
         this.maxSize = maxSize;
         this.buffer = [];
@@ -72,9 +89,14 @@ class ReorderBuffer {
         return (this.buffer.length == this.maxSize);
     }
     addInstr(inst){
-        var e = this.element(inst);
-        if (!this.isFull()) this.buffer.push(e);
-        return e;
+        if (!this.isFull()){
+            var hwInUse = hardware.filter(function(unit){
+                return (unit.type === inst.FU)
+            })[0];
+            inst.hwInUse = hwInUse.addInstruction(inst);
+            this.buffer.push(inst);
+        }
+        return this.buffer[this.buffer.length-1];
     }
     getInst(n){
         return this.buffer[n];
@@ -85,30 +107,53 @@ class ReorderBuffer {
     getLastElement(){
         return this.getInst(this.getBuffLength()-1);
     }
-    clearBranch(){
-     for (var element in this.buffer){
-        if (!(   element.ready
-             &&    ((element.inst.inst === 'BNE')
-                 || (element.inst.inst === 'BEQ')))) continue;
-         
-            if (        ((element.inst.inst === 'BEQ')
-                    &&  (element.val === true))
-                ||      ((element.inst.inst === 'BNE' )
-                    &&  (element.val === false))){
-                return this.buffer.splice(this.buffer.length-element+1);
-            }
-        }
-        return false;
+    removeElement(i){
+        return this.buffer.splice(i, 1);
     }
     removeNext(){
-        if ((this.buffer[0] !== null) && (this.buffer[0].ready)){
-            return this.buffer.splice(0,1);
+        if ((this.buffer[0])){
+            if (this.buffer[0].ready){
+                return this.buffer.splice(0,1)[0];
+            }
         }
         return null;
     }
     toString(){
         return this.buffer;
     }
+    
+    executeInst(i, hw, scoreboard){
+        this.getInst(i).result = executeInstruction(this.getInst(i).inst,
+                                            this.getInst(i).hwInUse.inputA,
+                                            this.getInst(i).hwInUse.inputB,
+                                            this.getInst(i).dest);
+        this.getInst(i).nextState = "wb";
+        this.getInst(i).hwInUse.written = true;
+        
+        if (this.getInst(i).type === "ctrl" && this.getInst(i).result === true){
+            IC = getValue(this.getInst(i).dest);
+            var removedInsts = this.buffer.splice(i+1, this.getBuffLength()-i);
+            removedInsts.forEach(function(removed){
+                hw.forEach(function(unit){
+                    if (unit.type === removed.FU){
+                        unit.remove(removed);
+                    }
+                });
+                scoreboard.push(deepCopy(removed));
+            })
+        }
+    }
+    commitNextInst(){
+        var curInst = this.removeNext();
+        if (curInst === null)
+            return null;
+        
+        if (curInst.type !== "ctrl"){
+            setValue(curInst.dest, curInst.result);
+        }
+        return curInst;
+    }
+    
 }
 
 /***************************************************/
@@ -121,7 +166,7 @@ var intRegFile = Array(32).fill(0);
 var dataMem = [45, 12, 0, 0, 10, 135, 254, 127, 18, 4,
                55, 8, 2, 98, 13, 5, 233, 158, 167];
 var IC = 0;
-
+var hardware;
 /***************************************************/
 /**************** Funtion Declarations *************/
 /***************************************************/
@@ -180,7 +225,6 @@ function getHardware(hardware){
                         parseInt(document.getElementById('integer_rs').value),
                         false,
                         parseInt(document.getElementById('integer_clks').value)));
-    console.log(hardware);
     return hardware;
 }
 
@@ -202,8 +246,8 @@ function getInstructionType(instruction){
     }
     else if (parsed[0] == "S.D"){
         var regVal = parsed[2].match(/(\$\d+)/);
-        instructionObject = {type:"mem", dest:regVal[0], src:parsed[1],
-                             trgt:parsed[2], FU:"store"};
+        instructionObject = {type:"mem", dest:parsed[2], src:parsed[1],
+                             trgt:regVal[0], FU:"store"};
     }
     // Control Instruction
     else if ((parsed[0] == "BEQ") || (parsed[0] == "BNE")){
@@ -233,8 +277,10 @@ function getInstructionType(instruction){
     }
     instructionObject.inst = parsed[0];
     instructionObject.issue = null;
+    instructionObject.read = false;
     instructionObject.exec = null;
     instructionObject.wb = null;
+    instructionObject.ready = false;
     instructionObject.commit = null;
     instructionObject.state = "waiting";
     instructionObject.nextState = instructionObject.state;
@@ -290,6 +336,8 @@ function getValue(location){
  *      val - The value to set that register to.
  */
 function setValue(location, val){
+    
+    
     if (location[0] === 'F'){
         var idx = parseInt(location.substring(1));
         fpRegFile[idx] = val;
@@ -327,21 +375,19 @@ function setValue(location, val){
  */
 function executeInstruction(inst, srcVal, trgtVal, destLoc){
     if (inst === "L.D"){
-        return setValue(destLoc, srcVal);
+        return srcVal;
     }
     if (inst === "S.D"){
-        return setValue(trgtVal, srcVal);
+        return srcVal;
     }
     if (inst === "BEQ"){
         if (srcVal === trgtVal){
-            IC = getValue(destLoc);
             return true;
         }
         return false;
     }
     if (inst === "BNE"){
         if (srcVal !== trgtVal){
-            IC = getValue(destLoc);
             return true;
         }
         return false;
@@ -351,22 +397,18 @@ function executeInstruction(inst, srcVal, trgtVal, destLoc){
     // saved as a float or int.
     if (inst.match(/ADD/)){
         var sum = srcVal+trgtVal;
-        setValue(destLoc, sum);
         return sum;
     }
     if (inst.match(/SUB/)){
         var diff = srcVal-trgtVal;
-        setValue(destLoc, diff);
         return diff;
     }
     if (inst === "MULT.D"){
         var prod = srcVal*trgtVal;
-        setValue(destLoc, prod);
         return prod;
     }
     if (inst === "DIV.D"){
         var quot = srcVal/trgtVal;
-        setValue(destLoc, quot);
         return quot;
     }
 }
@@ -413,14 +455,14 @@ function printScoreboard(sb){
     table.appendChild(row);
     for (var inst = 0; inst < sb.length; inst++){
         row = document.createElement("tr");
-        for (var element in headers){
+        headers.forEach(function(header){
             var col = document.createElement("td");
-            if (sb[inst][headers[element].toLowerCase()] !== null)
-                col.innerHTML=sb[inst][headers[element].toLowerCase()];
+            if (sb[inst][header.toLowerCase()] !== null)
+                col.innerHTML=sb[inst][header.toLowerCase()];
             else
                 col.innerHTML='N/A';
             row.appendChild(col);
-        }
+        });
         table.appendChild(row);
     }
 }
@@ -480,13 +522,17 @@ function printRegisterFile(regFile, htmlTable, title){
 */
 function runScoreboard(){
     // Setup
+    fpRegFile = Array(32).fill(0.0);
+    intRegFile = Array(32).fill(0);
+    dataMem = [45, 12, 0, 0, 10, 135, 254, 127, 18, 4,
+                   55, 8, 2, 98, 13, 5, 233, 158, 167];
     IC = 0;
-    var clk = 0;
+    var clk = 1;
     var pipeline = [];
     var instList = document.getElementById('instruction_input').value;
     var scoreboard = [];
     var ROB = new ReorderBuffer(parseInt(document.getElementById('rob_slots').value));
-    var hardware = getHardware();
+    hardware = getHardware();
     
     // Split each line into its own instruction and remove empty/commented lines
     instList = instList.split('\n');
@@ -504,17 +550,66 @@ function runScoreboard(){
     
     // Loop as long as IC is not at the end of the program and there are
     // instructions in the ROB
-    while ((IC < instList.length) || (ROB.length > 0)){
+    while ((IC < instList.length) || (ROB.getBuffLength() > 0)){
         
         // Loop through instructions in the ROB to and update their state as necessary
+        var instWritten = false; // Only one instruction can be written to the ROB at a time
         for (var inst in ROB.buffer){
-            /****** NOTE: If instructions can read the same cycle a register is written to,
-             *            check instructions next states as well?
-             */
+            var curInst = ROB.getInst(inst);
             // read/execute
-            
-            // Writeback
-            
+            if (curInst.state === "issue" && !curInst.read){
+                // otherwise, check if it can read
+                var canRead = true;
+                var useSrc = null, useTrgt = null;
+                for (var i = inst-1; i >= 0; i--){
+                    var otherInst = ROB.getInst(i);
+                    if (otherInst.dest === curInst.src){
+                        if (!otherInst.wb){
+                            canRead = false;
+                        }
+                        else{
+                            useSrc = otherInst.result;
+                        }
+                        break;
+                    }
+                }
+                for (var i = inst-1; i >= 0; i--){
+                    var otherInst = ROB.getInst(i);
+                    if (otherInst.dest === curInst.trgt){
+                        if (!otherInst.wb){
+                            canRead = false;
+                        }
+                        else{
+                            useTrgt = otherInst.result;
+                        }
+                        break;
+                    }
+                }
+                if (canRead){
+                    curInst.hwInUse.inputA = (useSrc || getValue(curInst.src));
+                    if (curInst.inst === "S.D")
+                        curInst.hwInUse.inputB = (useTrgt || curInst.trgt);
+                    else if (curInst.inst === "L.D")
+                        curInst.hwInUse.inputB = 0;
+                    else
+                        curInst.hwInUse.inputB = (useTrgt || getValue(curInst.trgt));
+                    curInst.read = true;
+                }
+            }
+            else if (curInst.state === "exec"){
+                if (curInst.hwInUse.ready){
+                    if (!instWritten){
+                        ROB.executeInst(inst, hardware, scoreboard);
+                        instWritten = true;
+                    }
+                }
+            }
+            else if (curInst.state === "wb"){
+                curInst.ready = true;
+            }
+            if (curInst.state === "issue" && curInst.hwInUse.ready && curInst.read){
+                curInst.nextState = "exec";
+            }
         }
     
     
@@ -523,50 +618,95 @@ function runScoreboard(){
         // AND either (nothing is in the pipeline OR the last element in the
         // pipeline has issued)
         if (instList[IC] && !ROB.isFull()){
-            var fu = hardware.filter(function(unit){
-                return (unit.type === instList[IC].FU)
+            var fu;
+            hardware.forEach(function(unit){
+                if (unit.type === instList[IC].FU){
+                    fu = unit;
+                }
             });
-            console.log("Checking slots in " + fu);
-            if (!fu[0].isFull()){
-                ROB.addInstr(instList[IC]);
-                console.log("ROB:" + ROB.toString());
-                console.log(ROB.getLastElement())
-                ROB.getLastElement().inst.nextState = "issue";
+            if (!fu.isFull()){
+                ROB.addInstr(deepCopy(instList[IC]));
+                ROB.getLastElement().nextState = "issue";
                 IC++;
+                
             }
-            
-            console.log("---------- IC = " + IC + " -------------");
-            console.log(ROB);
-            console.log("----------------------------------------");
-            
         }
         
         // Update all states of instructions in the ROB and move completed
         // from the ROB to the scoreboard.
         for (var inst in ROB.buffer){
-            if (ROB.getInst(inst).inst.state !== ROB.getInst(inst).inst.nextState){
-                ROB.getInst(inst).inst.state = ROB.getInst(inst).inst.nextState;
-                var newState = ROB.getInst(inst).inst.state;
-                ROB.getInst(inst).inst[newState] = clk;
+            if (ROB.getInst(inst).state !== ROB.getInst(inst).nextState){
+                ROB.getInst(inst).state = ROB.getInst(inst).nextState;
+                var newState = ROB.getInst(inst).state;
+                ROB.getInst(inst)[newState] = clk;
             }
         }
         
         // Only allow one commit per clk cycle
-        var committedInst = ROB.removeNext();
+        var committedInst = ROB.commitNextInst();
         if (committedInst !== null){
-            scoreboard.push(committedInst);
+            committedInst.commit = clk;
+            scoreboard.push(deepCopy(committedInst));
         }
+        hardware.forEach(function (unit){
+            unit.removeWritten();
+            unit.cycleStation();
+        });
         clk++;
         
-        if (clk % 10000 == 0 && clk > instList.length*100){
+        if (clk % 100 == 0 && clk > instList.length*10){
             if (confirm("It looks like you might be in an infinite loop, " +
                         "Would you like to kill it?\n" +
                         "\rclk = " + clk)){
+                console.log(hardware);
+                console.log(ROB);
+                console.log(scoreboard);
+                
                 return null;
+                
             }
             
         }
     }
-    
+    scoreboard.sort(function(a, b){
+       return (a.issue - b.issue);
+    });
+    printScoreboard(scoreboard);printRegisterFile(intRegFile, "regFile_table", "RegFile");
+    printRegisterFile(fpRegFile, "fpRegFile_table", "FP RegFile");
+    printRegisterFile(dataMem, "dataMem_table", "Data Mem");
 }
-    
+
+
+/*******
+ *
+ * if an instruction is waiting for a src/trgt to be written to,
+ * it should take latency after WB for exec completion.
+ *
+ *
+ *
+ *
+ *
+ *
+ *///
+/*
+L.D F6 34($2)
+L.D F2 20($3)
+MULT.D F0 F2 F4
+SUB.D F8 F6 F2
+DIV.D F10 F0 F6
+ADD.D F6 F8 F2
+
+Simple branch
+
+
+
+
+
+
+sub.d f0 f0 f0
+add.d f1 f0 #2
+add.d f0 f0 #1
+bne f1 f0 #2
+add.i f10 #0 #123
+S.D f10 10($2)
+*/
