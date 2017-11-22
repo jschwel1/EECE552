@@ -96,6 +96,7 @@ class ReorderBuffer {
             inst.hwInUse = hwInUse.addInstruction(inst);
             this.buffer.push(inst);
         }
+        console.log(this.getLastElement());
         return this.buffer[this.buffer.length-1];
     }
     getInst(n){
@@ -123,15 +124,18 @@ class ReorderBuffer {
     }
     
     executeInst(i, hw, scoreboard){
-        this.getInst(i).result = executeInstruction(this.getInst(i).inst,
-                                            this.getInst(i).hwInUse.inputA,
-                                            this.getInst(i).hwInUse.inputB,
-                                            this.getInst(i).dest);
-        this.getInst(i).nextState = "wb";
-        this.getInst(i).hwInUse.written = true;
+        var thisInst = this.getInst(i);
+        thisInst.result = executeInstruction(thisInst.inst,
+                                            thisInst.hwInUse.inputA,
+                                            thisInst.hwInUse.inputB,
+                                            thisInst.dest);
         
-        if (this.getInst(i).type === "ctrl" && this.getInst(i).result === true){
-            IC = getValue(this.getInst(i).dest);
+    console.log(thisInst.inst + " ("+thisInst.hwInUse.inputA+", " + thisInst.hwInUse.inputB + ") = " + thisInst.result + " -> " + thisInst.dest);
+        thisInst.nextState = "wb";
+        thisInst.hwInUse.written = true;
+        
+        if (thisInst.type === "ctrl" && thisInst.result === true){
+            IC = getValue(thisInst.dest);
             var removedInsts = this.buffer.splice(i+1, this.getBuffLength()-i);
             removedInsts.forEach(function(removed){
                 hw.forEach(function(unit){
@@ -241,8 +245,9 @@ function getInstructionType(instruction){
     var instructionObject;
     // Memory Instruction
     if (parsed[0] == "L.D"){
+        var regVal = parsed[2].match(/(\$\d+)/);
         instructionObject = {type:"mem", dest:parsed[1], src:parsed[2],
-                             trgt:null, FU:"load"};
+                             trgt:regVal[0], FU:"load"};
     }
     else if (parsed[0] == "S.D"){
         var regVal = parsed[2].match(/(\$\d+)/);
@@ -566,8 +571,10 @@ function runScoreboard(){
                     if (otherInst.dest === curInst.src){
                         if (!otherInst.wb){
                             canRead = false;
+                            console.log(curInst.inst + " needs to get its src from " + otherInst.inst);
                         }
                         else{
+                            console.log(curInst.inst + " needs to get its src from " + otherInst.inst + " result="+otherInst.result);
                             useSrc = otherInst.result;
                         }
                         break;
@@ -578,15 +585,30 @@ function runScoreboard(){
                     if (otherInst.dest === curInst.trgt){
                         if (!otherInst.wb){
                             canRead = false;
+                            console.log(curInst.inst + " needs to get its trgt from " + otherInst.inst);
                         }
                         else{
                             useTrgt = otherInst.result;
+                            console.log(curInst.inst + " needs to get its trgt from " + otherInst.inst + " result="+otherInst.result);
                         }
                         break;
                     }
                 }
                 if (canRead){
-                    curInst.hwInUse.inputA = (useSrc || getValue(curInst.src));
+                    if (curInst.inst === "L.D"){
+                        var memLoc;
+                        if (useTrgt){
+                            var offset = curInst.src.match(/(\d*)\(\$\d+\)/)[1];
+                            curInst.hwInUse.inputA = dataMem[parseInt(useTrgt)+parseInt(offset)];
+                        }
+                        else{
+                            curInst.hwInUse.inputA = getValue(curInst.src);
+                        }
+                    }
+                    else{
+                        curInst.hwInUse.inputA = (useSrc || getValue(curInst.src));
+                    }
+                    
                     if (curInst.inst === "S.D")
                         curInst.hwInUse.inputB = (useTrgt || curInst.trgt);
                     else if (curInst.inst === "L.D")
@@ -682,6 +704,28 @@ function runScoreboard(){
  * if an instruction is waiting for a src/trgt to be written to,
  * it should take latency after WB for exec completion.
  *
+ *
+ *
+ * ISSUE: L.D Uses old data if src/trgt is updated before it:
+    SUB.I $1, $1, $1 ; clear $1
+    SUB.I $2, $1, $1 ; clear $2
+    ADD.I $1, $1, #16 ; $1 = 16
+    L.D F9, 1($1)     ; ld dm[17]->f9
+    MULT.D F0, F1, F0 ; f0 = f1 * f2 <-- Loop dest
+    ADD.D F4, F0, F2  ; f4 = f0 + f2
+    S.D F4, 0($2)   ;store f4 -> dm[0+$2]
+    ADD.I $2, $2, #8 ; $2 = $2 + 8
+    BNE $1, $2, #4 ; if ($1 != $2) go to Loop dest
+    DIV.D F11, F9, F9
+    MULT.D F8, F8, F8
+    L.D F4, 1($2)
+    DIV.D F10, F4, F4
+    
+    or simpler:
+    sub $1 $1 $1
+    add.i $1 $1 #5
+    l.d f4 0($1)
+    ^ will load dm[0] instead of the expected dm[5]
  *
  *
  *
