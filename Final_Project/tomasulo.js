@@ -177,6 +177,7 @@ var dataMem = [45, 12, 0, 0, 10, 135, 254, 127, 18, 4,
                55, 8, 2, 98, 13, 5, 233, 158, 167];
 var IC = 0;
 var hardware;
+var tag = 0;
 /***************************************************/
 /**************** Funtion Declarations *************/
 /***************************************************/
@@ -294,7 +295,8 @@ function getInstructionType(instruction){
     instructionObject.ready = false;
     instructionObject.commit = null;
     instructionObject.state = "waiting";
-    instructionObject.id = new Date().getTime();
+    instructionObject.id = tag;
+    tag++;
     instructionObject.nextState = instructionObject.state;
     return instructionObject;
 }
@@ -545,7 +547,7 @@ function runScoreboard(){
     var scoreboard = [];
     var ROB = new ReorderBuffer(parseInt(document.getElementById('rob_slots').value));
     hardware = getHardware();
-    
+    tag = 0;
     // Split each line into its own instruction and remove empty/commented lines
     instList = instList.split('\n');
     instList = instList.filter(function(inst){
@@ -783,3 +785,12 @@ add.d f10 f4 f0
 s.d f4 2($0)
 
 */
+/*********************************
+ *
+ * DON'T DELETE THINGS UNTIL BRANCH COMMMITS
+ *
+ * n - commit branch
+ * n+1 - flush ROB
+ * n+2 - fetch at new IC
+ *
+ **********************************/
