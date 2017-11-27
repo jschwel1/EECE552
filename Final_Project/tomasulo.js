@@ -69,9 +69,7 @@ class ReservationStation_t {
         });
     }
     removeById(id){
-        console.log(this.rs);
         for (var inst = 0; inst < this.rs.length; inst++){
-            console.log(this.rs[inst])
             if (id === this.rs[inst].id){
                 return this.rs.splice(inst, 1);
             }
@@ -101,7 +99,6 @@ class ReorderBuffer {
             inst.hwInUse = hwInUse.addInstruction(inst);
             this.buffer.push(inst);
         }
-        console.log(this.getLastElement());
         return this.buffer[this.buffer.length-1];
     }
     getInst(n){
@@ -134,8 +131,6 @@ class ReorderBuffer {
                                             thisInst.hwInUse.inputA,
                                             thisInst.hwInUse.inputB,
                                             thisInst.dest);
-        
-        console.log(thisInst.inst + " ("+thisInst.hwInUse.inputA+", " + thisInst.hwInUse.inputB + ") = " + thisInst.result + " -> " + thisInst.dest);
         thisInst.nextState = "wb";
         thisInst.hwInUse.written = true;
         
@@ -147,10 +142,6 @@ class ReorderBuffer {
             this.buffer = this.buffer.filter(function(val, idx){
                 return idx <= i;
             });
-            console.log("Keeping:")
-            console.log(this.buffer);
-            console.log("Removing: ")
-            console.log(removedInsts);
             removedInsts.forEach(function(removed){
                 hw.forEach(function(unit){
                     if (unit.type === removed.FU){
@@ -159,8 +150,6 @@ class ReorderBuffer {
                     }
                 });
             });
-                
-            console.log("done removing");
         }
         
     }
@@ -589,10 +578,8 @@ function runScoreboard(){
                     if (otherInst.dest === curInst.src){
                         if (!otherInst.wb){
                             canRead = false;
-                            console.log(curInst.inst + " needs to get its src from " + otherInst.inst);
                         }
                         else{
-                            console.log(curInst.inst + " needs to get its src from " + otherInst.inst + " result="+otherInst.result);
                             useSrc = otherInst.result;
                         }
                         break;
@@ -603,11 +590,9 @@ function runScoreboard(){
                     if (otherInst.dest === curInst.trgt){
                         if (!otherInst.wb){
                             canRead = false;
-                            console.log(curInst.inst + " needs to get its trgt from " + otherInst.inst);
                         }
                         else{
                             useTrgt = otherInst.result;
-                            console.log(curInst.inst + " needs to get its trgt from " + otherInst.inst + " result="+otherInst.result);
                         }
                         break;
                     }
