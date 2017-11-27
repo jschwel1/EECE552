@@ -193,7 +193,7 @@ function startScoreboard(){
     }
     catch (e){
         alert("Error: " + e + "\n");
-        console.log(e.stack);
+        console.error(e.stack);
     }
 }
 
@@ -415,11 +415,11 @@ function executeInstruction(inst, srcVal, trgtVal, destLoc){
         var diff = srcVal-trgtVal;
         return diff;
     }
-    if (inst === "MULT.D"){
+    if (inst.match(/MULT/)){
         var prod = srcVal*trgtVal;
         return prod;
     }
-    if (inst === "DIV.D"){
+    if (inst.match(/DIV/)){
         var quot = srcVal/trgtVal;
         return quot;
     }
@@ -710,24 +710,24 @@ function runScoreboard(){
  *
  *
  * ISSUE: L.D Uses old data if src/trgt is updated before it:
-    SUB.I $1, $1, $1 ; clear $1
-    SUB.I $2, $1, $1 ; clear $2
-    ADD.I $1, $1, #16 ; $1 = 16
-    L.D F9, 1($1)     ; ld dm[17]->f9
-    MULT.D F0, F1, F0 ; f0 = f1 * f2 <-- Loop dest
-    ADD.D F4, F0, F2  ; f4 = f0 + f2
-    S.D F4, 0($2)   ;store f4 -> dm[0+$2]
-    ADD.I $2, $2, #8 ; $2 = $2 + 8
-    BNE $1, $2, #4 ; if ($1 != $2) go to Loop dest
-    DIV.D F11, F9, F9
-    MULT.D F8, F8, F8
-    L.D F4, 1($2)
-    DIV.D F10, F4, F4
+SUB.I $1, $1, $1 ; clear $1
+SUB.I $2, $1, $1 ; clear $2
+ADD.I $1, $1, #16 ; $1 = 16
+L.D F9, 1($1)     ; ld dm[17]->f9
+MULT.D F0, F1, F0 ; f0 = f1 * f2 <-- Loop dest
+ADD.D F4, F0, F2  ; f4 = f0 + f2
+S.D F4, 0($2)   ;store f4 -> dm[0+$2]
+ADD.I $2, $2, #8 ; $2 = $2 + 8
+BNE $1, $2, #4 ; if ($1 != $2) go to Loop dest
+DIV.D F11, F9, F9
+MULT.D F8, F8, F8
+L.D F4, 1($2)
+DIV.D F10, F4, F4
     
     or simpler:
-    sub $1 $1 $1
-    add.i $1 $1 #5
-    l.d f4 0($1)
+sub $1 $1 $1
+add.i $1 $1 #5
+l.d f4 0($1)
     ^ will load dm[0] instead of the expected dm[5]
  *
  *
@@ -756,4 +756,30 @@ add.d f0 f0 #1
 bne f1 f0 #2
 add.i f10 #0 #123
 S.D f10 10($2)
+
+
+more branches:
+
+SUB $1, $1, $1    ; $1 = 0
+ADD.I $2, $1, #18 ; $2 = 18
+L.D F2 0($2)      ; f2 = dm[18]
+L.D F1 0($1)      ; f1 = dm[0]
+ADD.I $1 $1 #1    ; $1++
+BNE F1 F2 #3      ; (F1 != F2) -> IC = 3;
+ADD.D F3 F1 F2
+DIV.D F4 F3 #2
+BEQ f4 f4 #20 ; ln 8
+mult.d f3 f3 #2
+mult.d f4 f4 f4
+mult.d f1, f2,f3
+mult.d f2, f2,f3
+mult.d f3, f2,f3
+add.d f10 f4 f0
+add.d f10 f4 f0
+add.d f10 f4 f0
+add.d f10 f4 f0
+add.d f10 f4 f0
+add.d f10 f4 f0
+s.d f4 2($0)
+
 */
