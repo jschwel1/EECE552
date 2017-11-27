@@ -26,7 +26,7 @@ class ReservationStation_t {
         else {
             this.rs.push({inst:inst.inst, src:inst.src, trgt:inst.trgt,
                           inputA:null, inputB:null, result: null,
-                          cycle:this.latency-1, ready:false, written:false,});
+                          cycle:this.latency-1, ready:false, written:false, id: inst.id});
             // for single cycle instructions, they will be ready on the next cycle
             if (this.rs[this.rs.length-1].cycle <= 0){
                 this.rs[this.rs.length-1].ready = true;
@@ -68,10 +68,15 @@ class ReservationStation_t {
             return !element.written;
         });
     }
-    remove(elem){
-        this.rs = this.rs.filter(function(element){
-            return elem !== element;
-        });
+    removeById(id){
+        console.log(this.rs);
+        for (var inst = 0; inst < this.rs.length; inst++){
+            console.log(this.rs[inst])
+            if (id === this.rs[inst].id){
+                return this.rs.splice(inst, 1);
+            }
+        }
+        return null;
     }
 }
 /**
@@ -130,22 +135,34 @@ class ReorderBuffer {
                                             thisInst.hwInUse.inputB,
                                             thisInst.dest);
         
-    console.log(thisInst.inst + " ("+thisInst.hwInUse.inputA+", " + thisInst.hwInUse.inputB + ") = " + thisInst.result + " -> " + thisInst.dest);
+        console.log(thisInst.inst + " ("+thisInst.hwInUse.inputA+", " + thisInst.hwInUse.inputB + ") = " + thisInst.result + " -> " + thisInst.dest);
         thisInst.nextState = "wb";
         thisInst.hwInUse.written = true;
         
         if (thisInst.type === "ctrl" && thisInst.result === true){
             IC = getValue(thisInst.dest);
-            var removedInsts = this.buffer.splice(i+1, this.getBuffLength()-i);
+            var removedInsts = this.buffer.filter(function(val, idx){
+                return idx > i;
+            });
+            this.buffer = this.buffer.filter(function(val, idx){
+                return idx <= i;
+            });
+            console.log("Keeping:")
+            console.log(this.buffer);
+            console.log("Removing: ")
+            console.log(removedInsts);
             removedInsts.forEach(function(removed){
                 hw.forEach(function(unit){
                     if (unit.type === removed.FU){
-                        unit.remove(removed);
+                        scoreboard.push(deepCopy(removed));
+                        unit.removeById(removed.id);
                     }
                 });
-                scoreboard.push(deepCopy(removed));
-            })
+            });
+                
+            console.log("done removing");
         }
+        
     }
     commitNextInst(){
         var curInst = this.removeNext();
@@ -288,6 +305,7 @@ function getInstructionType(instruction){
     instructionObject.ready = false;
     instructionObject.commit = null;
     instructionObject.state = "waiting";
+    instructionObject.id = new Date().getTime();
     instructionObject.nextState = instructionObject.state;
     return instructionObject;
 }
@@ -559,7 +577,7 @@ function runScoreboard(){
         
         // Loop through instructions in the ROB to and update their state as necessary
         var instWritten = false; // Only one instruction can be written to the ROB at a time
-        for (var inst in ROB.buffer){
+        for (var inst = 0; inst < ROB.getBuffLength(); inst++){
             var curInst = ROB.getInst(inst);
             // read/execute
             if (curInst.state === "issue" && !curInst.read){
@@ -676,7 +694,7 @@ function runScoreboard(){
         });
         clk++;
         
-        if (clk % 100 == 0 && clk > instList.length*10){
+        if (clk % 1000 == 0 && clk > instList.length*100){
             if (confirm("It looks like you might be in an infinite loop, " +
                         "Would you like to kill it?\n" +
                         "\rclk = " + clk)){
