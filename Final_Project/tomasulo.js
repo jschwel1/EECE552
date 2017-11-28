@@ -125,7 +125,7 @@ class ReorderBuffer {
         return this.buffer;
     }
     
-    executeInst(i, hw, scoreboard){
+    executeInst(i){
         var thisInst = this.getInst(i);
         thisInst.result = executeInstruction(thisInst.inst,
                                             thisInst.hwInUse.inputA,
@@ -133,27 +133,8 @@ class ReorderBuffer {
                                             thisInst.dest);
         thisInst.nextState = "wb";
         thisInst.hwInUse.written = true;
-        
-        if (thisInst.type === "ctrl" && thisInst.result === true){
-            IC = getValue(thisInst.dest);
-            var removedInsts = this.buffer.filter(function(val, idx){
-                return idx > i;
-            });
-            this.buffer = this.buffer.filter(function(val, idx){
-                return idx <= i;
-            });
-            removedInsts.forEach(function(removed){
-                hw.forEach(function(unit){
-                    if (unit.type === removed.FU){
-                        scoreboard.push(deepCopy(removed));
-                        unit.removeById(removed.id);
-                    }
-                });
-            });
-        }
-        
     }
-    commitNextInst(){
+    commitNextInst(clk, scoreboard){
         var curInst = this.removeNext();
         if (curInst === null)
             return null;
@@ -161,6 +142,22 @@ class ReorderBuffer {
         if (curInst.type !== "ctrl"){
             setValue(curInst.dest, curInst.result);
         }
+        else if (curInst.result === true){
+            IC = getValue(curInst.dest);
+            var removedInsts = this.buffer;
+            this.buffer = [];
+            removedInsts.forEach(function(removed){
+                hardware.forEach(function(unit){
+                    if (unit.type === removed.FU){
+                        scoreboard.push(deepCopy(removed));
+                        unit.removeById(removed.id);
+                    }
+                });
+            });
+        
+        }
+        curInst.commit = clk;
+        scoreboard.push(deepCopy(curInst));
         return curInst;
     }
     
@@ -565,7 +562,6 @@ function runScoreboard(){
     // Loop as long as IC is not at the end of the program and there are
     // instructions in the ROB
     while ((IC < instList.length) || (ROB.getBuffLength() > 0)){
-        
         // Loop through instructions in the ROB to and update their state as necessary
         var instWritten = false; // Only one instruction can be written to the ROB at a time
         for (var inst = 0; inst < ROB.getBuffLength(); inst++){
@@ -626,7 +622,7 @@ function runScoreboard(){
             else if (curInst.state === "exec"){
                 if (curInst.hwInUse.ready){
                     if (!instWritten){
-                        ROB.executeInst(inst, hardware, scoreboard);
+                        ROB.executeInst(inst);
                         instWritten = true;
                     }
                 }
@@ -670,10 +666,11 @@ function runScoreboard(){
         }
         
         // Only allow one commit per clk cycle
-        var committedInst = ROB.commitNextInst();
-        if (committedInst !== null){
-            committedInst.commit = clk;
-            scoreboard.push(deepCopy(committedInst));
+        var committedInst = ROB.commitNextInst(clk, scoreboard);
+        // brute-force way to add the extra cycle in to account for flushing
+        // the ROB and issuing the next instruction
+        if (committedInst && committedInst.type === "ctrl" && committedInst.result === true){
+            clk++;
         }
         hardware.forEach(function (unit){
             unit.removeWritten();
@@ -783,6 +780,22 @@ add.d f10 f4 f0
 add.d f10 f4 f0
 add.d f10 f4 f0
 s.d f4 2($0)
+
+
+
+SUBI $1, $1, $1
+SUBI $2, $1, $1
+ADDI $1, $1, #16
+L.D F9, 1($1)
+MULT.D F0, F1, F0
+ADD.D F4, F0, F2
+S.D F4, 0($2)
+ADDI $2, $2, #8
+BNE $1, $2, #4
+DIV.D F11, F9, F9
+MULT.D F8, F8, F8
+L.D F4, 1($2)
+DIV.D F10, F4, F4
 
 */
 /*********************************
