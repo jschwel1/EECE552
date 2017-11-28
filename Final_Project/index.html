@@ -3,45 +3,98 @@
 <html>
 <head>
 	<meta charset="utf-8">
-	<title>Scoreboarding</title>
+	<title>Tomasulo's Algorithm with Reorder Buffer</title>
 </head>
 <body>
-	<script src="scoreboard.js"></script>
-    <h1>EECE 552 Project 1: Scoreboarding</h1>
-    <a href="./README.txt" target="_blank">README/Instructions</a><br><br>
+	<script id="tomasuloScript" src="tomasulo.js"></script>
+    <h1>EECE 552 Final Project: Tomasulo's Algorithm with ROB</h1>
+    <a href="./README.html" target="_blank">README/Instructions</a><br><br>
     <!-- Table used to get input for latencies of the different Functional Units -->
     <div id="inputs" width="300px" style="float: left; padding: 50px 50px 50px 50px">
-		<table>
+		<table border="1px">
+		    <tr>
+		        <th>
+		            Functional Unit
+		        </th>
+		        <th>
+		            Latency
+		        </th>
+		        <th>
+		            Reservation Stations
+		        </th>
+		    </tr>
 			<tr>
 			    <td>
-			        FP Adder clks
+			        FP Adder
 			    </td>
 			    <td>
 	            	<textarea id="fpAdder_clks" rows="1" cols="10" maxlength="10">2</textarea>
 	            </td>
+			    <td>
+	            	<textarea id="fpAdder_rs" rows="1" cols="10" maxlength="10">3</textarea>
+	            </td>
 	        </tr>
 	        <tr>
 			    <td>
-			        FP Multiplier clks
+			        FP Multiplier
 			    </td>
 	            <td>
 	            	<textarea id="fpMult_clks" rows="1" cols="10" maxlength="10">10</textarea>
 	            </td>
-	        </tr>
-	        <tr>
-			    <td>
-			        FP Divider clks
-			    </td>
 	            <td>
-	            	<textarea id="fpDiv_clks" rows="1" cols="10" maxlength="10">40</textarea>
+	            	<textarea id="fpMult_rs" rows="1" cols="10" maxlength="10">2</textarea>
 	            </td>
 	        </tr>
 	        <tr>
 			    <td>
-			        Integer Unit clks
+			        FP Divider
+			    </td>
+	            <td>
+	            	<textarea id="fpDiv_clks" rows="1" cols="10" maxlength="10">40</textarea>
+	            </td>
+	            <td>
+	            	<textarea id="fpDiv_rs" rows="1" cols="10" maxlength="10">2</textarea>
+	            </td>
+	        </tr>
+	        <tr>
+			    <td>
+			        Load Unit
+			    </td>
+	            <td>
+	            	<textarea id="load_clks" rows="1" cols="10" maxlength="10">2</textarea>
+	            </td>
+	            <td>
+	            	<textarea id="load_rs" rows="1" cols="10" maxlength="10">3</textarea>
+	            </td>
+	        </tr>
+	        <tr>
+			    <td>
+			        Store Unit
+			    </td>
+	            <td>
+	            	<textarea id="store_clks" rows="1" cols="10" maxlength="10">2</textarea>
+	            </td>
+	            <td>
+	            	<textarea id="store_rs" rows="1" cols="10" maxlength="10">3</textarea>
+	            </td>
+	        </tr>
+	        <tr> <!-- NOT PIPELINED -->
+			    <td>
+			        Integer Unit
 			    </td>
 	            <td>
 	            	<textarea id="integer_clks" rows="1" cols="10" maxlength="10">1</textarea>
+	            </td>
+	            <td>
+	            	<textarea id="integer_rs" rows="1" cols="10" maxlength="10">5</textarea>
+	            </td>
+	        </tr>
+	        <tr>
+			    <td>
+			        Reorder Buffer slots
+			    </td>
+	            <td>
+	            	<textarea id="rob_slots" rows="1" cols="10" maxlength="10">10</textarea>
 	            </td>
 	        </tr>
 	    </table>
