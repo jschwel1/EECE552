@@ -324,7 +324,7 @@ function getValue(location){
     if (location[0] === '#'){
         return parseInt(location.substring(1));
     }
-    var parsedInput = location.match(/(\d*)\(\$(\d)\)/);
+    var parsedInput = location.match(/(\d*)\(\$(\d+)\)/);
     if (parsedInput){
         index = parseInt(intRegFile[parsedInput[2]]);
         offset = parseInt(parsedInput[1]);
@@ -358,7 +358,7 @@ function setValue(location, val){
         // Ensure the value is an integer
         intRegFile[idx] = Math.floor(val);
     }
-    var parsedInput = location.match(/(\d*)\(\$(\d)\)/);
+    var parsedInput = location.match(/(\d*)\(\$(\d+)\)/);
     if (parsedInput){
         index = parseInt(intRegFile[parsedInput[2]]);
         offset = parseInt(parsedInput[1]);
