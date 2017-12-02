@@ -14,6 +14,7 @@ class ReservationStation_t {
         this.maxSize = size;
         this.pipelined = pipelined;
         this.latency = latency;
+        this.lastExecCycle = 0;
         this.rs = [];
     }
     addInstruction(inst){
@@ -25,7 +26,7 @@ class ReservationStation_t {
         }
         else {
             this.rs.push({inst:inst.inst, src:inst.src, trgt:inst.trgt,
-                          inputA:null, inputB:null, result: null,
+                          inputA:null, inputB:null, result:null, canExec:false,
                           cycle:this.latency-1, ready:false, written:false, id: inst.id});
             // for single cycle instructions, they will be ready on the next cycle
             if (this.rs[this.rs.length-1].cycle <= 0){
@@ -43,7 +44,7 @@ class ReservationStation_t {
     cycleStation(){
         if (this.pipelined){
             this.rs.forEach(function(rsSlot){
-                if (rsSlot.inputA !== null && rsSlot.inputB !== null){
+                if (rsSlot.inputA !== null && rsSlot.inputB !== null && rsSlot.canExec){
                     if (rsSlot.cycle > 0)
                         rsSlot.cycle--;
                     if (rsSlot.cycle === 0)
@@ -54,7 +55,7 @@ class ReservationStation_t {
         }
         else {
             if (this.rs.length > 0){
-                if (this.rs[0].inputA !== null && this.rs[0].inputB !== null){
+                if (this.rs[0].inputA !== null && this.rs[0].inputB !== null && this.rs[0].canExec){
                     if (this.rs[0].cycle > 0)
                         this.rs[0].cycle--;
                     if (this.rs[0].cycle === 0)
@@ -629,6 +630,19 @@ function runScoreboard(){
             }
             else if (curInst.state === "wb"){
                 curInst.ready = true;
+            }
+            if (curInst.state === "issue" && curInst.read && !curInst.hwInUse.canExec){
+                var resStation;
+                for (var unit in hardware){
+                    if (hardware[unit].type === curInst.FU){
+                        resStation = hardware[unit];
+                    }
+                }
+                if (resStation.lastExecCycle < clk){
+                    curInst.hwInUse.canExec = true;
+                    console.log("Starting exec for " + curInst.inst + " at " + clk);
+                    resStation.lastExecCycle = clk;
+                }
             }
             if (curInst.state === "issue" && curInst.hwInUse.ready && curInst.read){
                 curInst.nextState = "exec";
