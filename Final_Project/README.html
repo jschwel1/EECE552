@@ -5,7 +5,7 @@
 <body>
 	<p>
 		Computer Design, EECE 552 <br>
-		Mid-semester project: Scoreboarding program<br>
+		Final project: Scoreboarding with Tomasulo's Algorithm and Reorder Buffer<br>
 		Written by: Jacob Schwell<br>
 	</p>
 	
@@ -68,11 +68,11 @@
 			</li>
 			<li>To run the code, click the run button. The scoreboard and memory tables will generate at the bottom of the page upon completion.</li>
 		</ol>
-		Note: The register files will initialize to all 0s every time the the assembly code is run and will, therefore, lose all previous data, so make sure to only use a register if you know what is in it. Also, branch instructions will always predict not taken, but sice it has not committed anything, it can clear the ROB and immediately fetch the next instruction.<br><br>
+		Note: The register files will initialize to all 0s every time the the assembly code is run and will, therefore, lose all previous data, so make sure to only use a register if you know what is in it. Also, branch instructions will always predict not taken. If a branch is taken, it will require one cycle to flush the ROB, then fetch the next instruction on the following cycle. Branches are either taken or not taken once committed.<br><br>
 		Comments:<br>
 		The code will only read the necessary parameters for each instruction, so any additional text will be ignored and can be used for comments 
 		<ul>
-			<li>E.g. ADD.D F1 F2 F3 ; this is a comment.</li>
+			<li>E.g. ADD.D F1 F2 F3 <font color="green">; this is a comment.</font></li>
 			<li>Comment/blank lines are ignored by the parser, so they do not count towards branch destinations.</li>
 		</ul>
 		</p>
