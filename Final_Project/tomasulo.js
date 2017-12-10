@@ -78,6 +78,7 @@ class ReservationStation_t {
         return null;
     }
 }
+
 /**
  *  The reorder buffer in this program is an expansion of the actual
  *  reoder buffers in real hardware. This one acts similar to a pipeline
@@ -167,8 +168,6 @@ class ReorderBuffer {
 /***************************************************/
 /**************** Global Variables *****************/
 /***************************************************/
-
-// Global variables that are accessed by multiple functions
 var fpRegFile = Array(32).fill(0.0);
 var intRegFile = Array(32).fill(0);
 var dataMem = [45, 12, 0, 0, 10, 135, 254, 127, 18, 4,
@@ -176,10 +175,10 @@ var dataMem = [45, 12, 0, 0, 10, 135, 254, 127, 18, 4,
 var IC = 0;
 var hardware;
 var tag = 0;
+
 /***************************************************/
 /**************** Funtion Declarations *************/
 /***************************************************/
-
 
 /**
  * Function: startScoreboard()
@@ -540,7 +539,6 @@ function runScoreboard(){
                    55, 8, 2, 98, 13, 5, 233, 158, 167];
     IC = 0;
     var clk = 1;
-    var pipeline = [];
     var instList = document.getElementById('instruction_input').value;
     var scoreboard = [];
     var ROB = new ReorderBuffer(parseInt(document.getElementById('rob_slots').value));
@@ -567,11 +565,17 @@ function runScoreboard(){
         var instWritten = false; // Only one instruction can be written to the ROB at a time
         for (var inst = 0; inst < ROB.getBuffLength(); inst++){
             var curInst = ROB.getInst(inst);
+
             // read/execute
+            // If the current instruction issued, make sure all its sources are
+            // available before it starts executing
             if (curInst.state === "issue" && !curInst.read){
                 // otherwise, check if it can read
                 var canRead = true;
                 var useSrc = null, useTrgt = null;
+                // For both src and trgt, if another instruction that hasn't committed yet
+                // that was issued before this one is writing to a src/trgt of this instruction
+                // take the data from that instruction's result if available.
                 for (var i = inst-1; i >= 0; i--){
                     var otherInst = ROB.getInst(i);
                     if (otherInst.dest === curInst.src){
@@ -596,6 +600,7 @@ function runScoreboard(){
                         break;
                     }
                 }
+                // If it was able to get all the data, load the data into the hw element
                 if (canRead){
                     if (curInst.inst === "L.D"){
                         var memLoc;
@@ -620,6 +625,9 @@ function runScoreboard(){
                     curInst.read = true;
                 }
             }
+
+            // If currently executing check if the hw finished; however, only one instruction can
+            // write in a clock cycle
             else if (curInst.state === "exec"){
                 if (curInst.hwInUse.ready){
                     if (!instWritten){
@@ -628,9 +636,14 @@ function runScoreboard(){
                     }
                 }
             }
+
+            // If it is in the wb stage, it will be ready to commit
             else if (curInst.state === "wb"){
                 curInst.ready = true;
             }
+            
+            // Since only one instruction can start executing in a given hw unit, make sure
+            // this instruction can before it tries to
             if (curInst.state === "issue" && curInst.read && !curInst.hwInUse.canExec){
                 var resStation;
                 for (var unit in hardware){
@@ -643,16 +656,16 @@ function runScoreboard(){
                     resStation.lastExecCycle = clk;
                 }
             }
+
+            // if this instruction issued and the data is read in and the hw unit finished,
+            // it is in exec complete stage.
             if (curInst.state === "issue" && curInst.hwInUse.ready && curInst.read){
                 curInst.nextState = "exec";
             }
         }
     
-    
-        
-        // Add next element into the pipeline if there is another instruction
-        // AND either (nothing is in the pipeline OR the last element in the
-        // pipeline has issued)
+        // Add next element into the ROB if there is another instruction
+        // AND there is room in the ROB
         if (instList[IC] && !ROB.isFull()){
             var fu;
             hardware.forEach(function(unit){
