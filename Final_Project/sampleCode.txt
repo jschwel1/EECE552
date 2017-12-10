@@ -1,0 +1,24 @@
+SUB.I $1, $1, $1 ; clear $1		
+SUB.I $2, $1, $1 ; clear $2		
+ADD.I $1, $1, #16 ; $1 = 16		
+L.D F9, 1($1)     ; ld dm[17]->f9		
+MULT.D F0, F1, F0 ; f0 = f1 * f2 <-- Loop dest		
+ADD.D F4, F0, F2  ; f4 = f0 + f2		
+S.D F4, 0($2)   ;store f4> dm[0+$2]		
+ADD.I $2, $2, #8 ; $2 = $2 + 8		
+BNE $1, $2, #4 ; if ($1 != $2) go to Loop dest		
+DIV.D F11, F9, F9		
+MULT.D F8, F8, F8		
+L.D F4, 1($2)		
+DIV.D F10, F4, F4
+
+sub $1 $1 $1		
+add.i $1 $1 #5		
+l.d f4 0($1)
+
+L.D F6 34($2)		
+L.D F2 20($3)		
+MULT.D F0 F2 F4		
+SUB.D F8 F6 F2		
+DIV.D F10 F0 F6		
+ADD.D F6 F8 F2
